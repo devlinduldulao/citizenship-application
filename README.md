@@ -1,8 +1,58 @@
-# Full Stack FastAPI Template
+# Norwegian Citizenship Automation MVP
 
 <a href="https://github.com/fastapi/full-stack-fastapi-template/actions?query=workflow%3A%22Test+Docker+Compose%22" target="_blank"><img src="https://github.com/fastapi/full-stack-fastapi-template/workflows/Test%20Docker%20Compose/badge.svg" alt="Test Docker Compose"></a>
 <a href="https://github.com/fastapi/full-stack-fastapi-template/actions?query=workflow%3A%22Test+Backend%22" target="_blank"><img src="https://github.com/fastapi/full-stack-fastapi-template/workflows/Test%20Backend/badge.svg" alt="Test Backend"></a>
 <a href="https://coverage-badge.samuelcolvin.workers.dev/redirect/fastapi/full-stack-fastapi-template" target="_blank"><img src="https://coverage-badge.samuelcolvin.workers.dev/fastapi/full-stack-fastapi-template.svg" alt="Coverage"></a>
+
+## What this project is about
+
+This project is a **monolithic MVP** that demonstrates how Norway's citizenship application process can be accelerated using automation.
+
+The goal is to reduce manual bottlenecks (currently up to ~2 years waiting time in many cases) by combining:
+
+- document upload and structured case intake,
+- OCR/NLP-assisted extraction,
+- explainable rule-based eligibility scoring,
+- caseworker decision support,
+- immutable audit trail for accountability.
+
+The intended audience includes **UDI/Politi stakeholders** who need a practical, demo-ready system that is fast, transparent, and operationally realistic.
+
+## MVP scope (implemented)
+
+### Phase 1 — Intake and processing pipeline
+
+- Citizenship application creation and management
+- Requirement document upload (PDF/image)
+- Background processing pipeline skeleton for OCR extraction
+
+### Phase 2 — Explainable eligibility engine
+
+- Deterministic weighted rule engine
+- Confidence score and risk level per application
+- Rule-by-rule rationale and evidence breakdown API
+- Frontend explainability panel for reviewers
+
+### Phase 3 — Human-in-the-loop decisioning
+
+- Superuser caseworker decision actions (`approve`, `reject`, `request_more_info`)
+- Mandatory decision reason capture
+- Immutable audit trail endpoint and UI timeline
+- End-to-end tested runtime flow (intake → processing → review decision)
+
+## Why this approach
+
+- **Fast to build and demo:** monolith architecture for MVP speed
+- **Safer than black-box AI:** explainable scoring and explicit rules
+- **Operationally credible:** supports human oversight and auditability
+- **Extensible:** can incrementally add stronger OCR/ML models and policy rules
+
+## Next planned phases
+
+- Reviewer queue prioritization and SLA tracking
+- Exportable decision/audit report for case handoff
+- Stronger policy rule coverage aligned to legal requirements
+- Production hardening (security, observability, governance)
 
 ## Technology Stack and Features
 

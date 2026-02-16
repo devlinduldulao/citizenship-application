@@ -1,4 +1,23 @@
-# FastAPI Project - Backend
+# Norwegian Citizenship Automation MVP - Backend
+
+This backend provides the API and decisioning engine for a monolithic MVP focused on accelerating citizenship application processing.
+
+## Backend responsibilities
+
+- Applicant case intake and application lifecycle management
+- Requirement document upload and processing pipeline orchestration
+- Explainable eligibility scoring with weighted rule results
+- Caseworker review decisions (`approve`, `reject`, `request_more_info`)
+- Immutable audit trail for system and human actions
+
+## Implemented API domains
+
+- Auth and user management (`/login`, `/users`)
+- Applications and documents (`/applications`)
+- Automated pre-screening + decision breakdown (`/applications/{id}/decision-breakdown`)
+- Caseworker actions + audit (`/applications/{id}/review-decision`, `/applications/{id}/audit-trail`)
+
+The core data and schema definitions are in `./backend/app/models.py` and route handlers are in `./backend/app/api/routes/`.
 
 ## Requirements
 
@@ -27,7 +46,7 @@ $ source .venv/bin/activate
 
 Make sure your editor is using the correct Python virtual environment, with the interpreter at `backend/.venv/bin/python`.
 
-Modify or add SQLModel models for data and SQL tables in `./backend/app/models.py`, API endpoints in `./backend/app/api/`, CRUD (Create, Read, Update, Delete) utils in `./backend/app/crud.py`.
+Modify or add SQLModel models for data and SQL tables in `./backend/app/models.py`, API endpoints in `./backend/app/api/`, and reusable domain logic in dedicated modules under `./backend/app/`.
 
 ## VS Code
 
@@ -99,6 +118,10 @@ $ bash ./scripts/test.sh
 
 The tests run with Pytest, modify and add tests to `./backend/tests/`.
 
+For the citizenship MVP APIs, focused route tests are in:
+
+- `./backend/tests/api/routes/test_applications.py`
+
 If you use GitHub Actions the tests will run automatically.
 
 ### Test running stack
@@ -162,6 +185,12 @@ $ alembic upgrade head
 ```
 
 If you don't want to start with the default models and want to remove them / modify them, from the beginning, without having any previous revision, you can remove the revision files (`.py` Python files) under `./backend/app/alembic/versions/`. And then create a first migration as described above.
+
+Recent MVP migrations include citizenship domain tables for:
+
+- applications and uploaded documents,
+- eligibility rule results,
+- review decisions and audit events.
 
 ## Email Templates
 

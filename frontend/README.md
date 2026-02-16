@@ -1,6 +1,14 @@
-# FastAPI Project - Frontend
+# Norwegian Citizenship Automation MVP - Frontend
 
-The frontend is built with [Vite](https://vitejs.dev/), [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/), [TanStack Query](https://tanstack.com/query), [TanStack Router](https://tanstack.com/router) and [Tailwind CSS](https://tailwindcss.com/).
+The frontend is the review dashboard for the citizenship automation MVP, built with [Vite](https://vitejs.dev/), [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/), [TanStack Query](https://tanstack.com/query), [TanStack Router](https://tanstack.com/router) and [Tailwind CSS](https://tailwindcss.com/).
+
+## Frontend responsibilities
+
+- Applicant case creation and requirement upload workflow
+- Processing queue visibility with status tracking
+- Explainable AI/rule insights (confidence, risk, per-rule rationale)
+- Caseworker final decision actions with mandatory reason
+- Audit trail timeline for accountability and traceability
 
 ## Requirements
 
@@ -14,6 +22,8 @@ bun run dev
 ```
 
 * Then open your browser at http://localhost:5173/.
+
+After login, the main MVP workflow is on the `Applications` page.
 
 Notice that this live server is not running inside Docker, it's for local development, and that is the recommended workflow. Once you are happy with your frontend, you can build the frontend Docker image and start it, to test it in a production-like environment. But building the image at every change will not be as productive as running the local development server with live reload.
 
@@ -89,6 +99,10 @@ The frontend code is structured as follows:
 * `frontend/src/components` -  The different components of the frontend.
 * `frontend/src/hooks` - Custom hooks.
 * `frontend/src/routes` - The different routes of the frontend which include the pages.
+
+For the citizenship MVP flow, the main screen is:
+
+* `frontend/src/routes/_layout/applications.tsx` - application intake, decision breakdown, caseworker actions, and audit timeline.
 
 ## End-to-End Testing with Playwright
 
