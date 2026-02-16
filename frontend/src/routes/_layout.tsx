@@ -25,11 +25,11 @@ function Layout() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1 text-muted-foreground" />
+        <header className="bg-background/80 border-b border-dashed backdrop-blur supports-[backdrop-filter]:bg-background/70 sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 px-4">
+          <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground" />
         </header>
-        <main className="flex-1 p-6 md:p-8">
-          <div className="mx-auto max-w-7xl">
+        <main className="from-background via-background to-muted/30 flex-1 bg-gradient-to-b p-6 md:p-8">
+          <div className="mx-auto max-w-7xl space-y-6">
             <Outlet />
           </div>
         </main>

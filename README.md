@@ -190,6 +190,33 @@ cd frontend && bun run lint         # Biome lint + format
 
 > **Warning:** Rotate all `changethis` defaults in `.env` before any shared deployment.
 
+### Login troubleshooting (spinner / CORS / devtools noise)
+
+If login keeps spinning, run these checks in order:
+
+```bash
+# 1) Ensure DB is healthy and reachable
+docker compose up -d db --wait
+
+# 2) Ensure admin user exists
+cd backend
+uv run python -m app.initial_data
+
+# 3) Start backend from project root with explicit project path
+cd ..
+uv run --project backend fastapi dev backend/app/main.py --port 8000
+
+# 4) Start frontend (configured to use strict port 5173)
+cd frontend
+bun run dev
+```
+
+Then hard-refresh the browser (`Ctrl+Shift+R`) and retry login.
+
+If Chrome console shows `chrome-extension://...` errors (message port / frame errors),
+those are from browser extensions (often password managers), not from this app. Test
+in Incognito mode (with extensions disabled) to verify app behavior.
+
 ### More details
 
 - Backend setup and workflow: [backend/README.md](./backend/README.md)

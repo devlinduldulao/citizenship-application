@@ -416,7 +416,7 @@ function ApplicationsPage() {
   return (
     <div className="flex flex-col gap-6">
       {currentUser?.is_superuser && (
-        <Card>
+        <Card className="border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle>Manual Review Workload</CardTitle>
             <CardDescription>
@@ -429,19 +429,19 @@ function ApplicationsPage() {
             )}
             {!reviewQueueMetricsQuery.isLoading && reviewQueueMetricsQuery.data && (
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="border rounded-md p-3">
+                <div className="bg-muted/30 border-border/60 rounded-md border p-3">
                   <p className="text-xs text-muted-foreground">Pending Manual</p>
                   <p className="text-xl font-semibold">
                     {reviewQueueMetricsQuery.data.pending_manual_count}
                   </p>
                 </div>
-                <div className="border rounded-md p-3">
+                <div className="bg-muted/30 border-border/60 rounded-md border p-3">
                   <p className="text-xs text-muted-foreground">Overdue SLA</p>
                   <p className="text-xl font-semibold text-destructive">
                     {reviewQueueMetricsQuery.data.overdue_count}
                   </p>
                 </div>
-                <div className="border rounded-md p-3">
+                <div className="bg-muted/30 border-border/60 rounded-md border p-3">
                   <p className="text-xs text-muted-foreground">Backlog Clearance</p>
                   <p className="text-xl font-semibold">
                     {reviewQueueMetricsQuery.data.estimated_days_to_clear_backlog} days
@@ -462,7 +462,10 @@ function ApplicationsPage() {
                   </p>
                 )}
               {reviewQueueQuery.data?.data.map((item) => (
-                <div key={item.id} className="border rounded-md p-3 space-y-1">
+                <div
+                  key={item.id}
+                  className="bg-muted/20 border-border/60 rounded-md border p-3 space-y-1"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{item.applicant_full_name}</p>
                     <div className="flex items-center gap-2">
@@ -482,8 +485,11 @@ function ApplicationsPage() {
         </Card>
       )}
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
+      <div className="space-y-2">
+        <p className="text-muted-foreground text-xs font-medium tracking-[0.12em] uppercase">
+          Case Operations
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">
           Citizenship Applications
         </h1>
         <p className="text-muted-foreground">
@@ -492,7 +498,7 @@ function ApplicationsPage() {
         </p>
       </div>
 
-      <Card>
+      <Card className="border-border/60 shadow-sm">
         <CardHeader>
           <CardTitle>Create New Application</CardTitle>
           <CardDescription>
@@ -546,13 +552,13 @@ function ApplicationsPage() {
                 Creating
               </>
             ) : (
-              "Create application"
+              "Create Application"
             )}
           </Button>
         </CardFooter>
       </Card>
 
-      <Card>
+      <Card className="border-border/60 shadow-sm">
         <CardHeader>
           <CardTitle>Upload Requirement Documents</CardTitle>
           <CardDescription>
@@ -615,7 +621,7 @@ function ApplicationsPage() {
                 Queuing
               </>
             ) : (
-              "Queue processing"
+              "Queue Processing"
             )}
           </Button>
           <Button onClick={handleUpload} disabled={uploadMutation.isPending}>
@@ -627,14 +633,14 @@ function ApplicationsPage() {
             ) : (
               <>
                 <Upload />
-                Upload document
+                Upload Document
               </>
             )}
           </Button>
         </CardFooter>
       </Card>
 
-      <Card>
+      <Card className="border-border/60 shadow-sm">
         <CardHeader>
           <CardTitle>Application Queue</CardTitle>
           <CardDescription>
@@ -655,7 +661,7 @@ function ApplicationsPage() {
           {sortedApplications.map((application) => (
             <div
               key={application.id}
-              className="border rounded-md p-4 flex flex-col gap-2"
+              className="bg-muted/20 border-border/60 rounded-md border p-4 flex flex-col gap-2"
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -680,7 +686,7 @@ function ApplicationsPage() {
       </Card>
 
       {selectedApplicationId && (
-        <Card>
+        <Card className="border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle>Uploaded Documents</CardTitle>
             <CardDescription>
@@ -700,7 +706,7 @@ function ApplicationsPage() {
             {documentsQuery.data?.data.map((document) => (
               <div
                 key={document.id}
-                className="border rounded-md p-3 flex items-center justify-between"
+                className="bg-muted/20 border-border/60 rounded-md border p-3 flex items-center justify-between"
               >
                 <div>
                   <p className="font-medium">{document.original_filename}</p>
@@ -718,7 +724,7 @@ function ApplicationsPage() {
       )}
 
       {selectedApplicationId && (
-        <Card>
+        <Card className="border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle>Decision Explainability</CardTitle>
             <CardDescription>
@@ -734,7 +740,7 @@ function ApplicationsPage() {
 
             {!breakdownQuery.isLoading && breakdownQuery.data && (
               <>
-                <div className="border rounded-md p-4 space-y-2">
+                <div className="bg-muted/20 border-border/60 rounded-md border p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-medium">Overall confidence</p>
                     <Badge variant="secondary">
@@ -762,7 +768,7 @@ function ApplicationsPage() {
                   {breakdownQuery.data.rules.map((rule) => (
                     <div
                       key={rule.id}
-                      className="border rounded-md p-3 flex flex-col gap-2"
+                      className="bg-muted/20 border-border/60 rounded-md border p-3 flex flex-col gap-2"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-medium">{rule.rule_name}</p>
@@ -789,7 +795,7 @@ function ApplicationsPage() {
       )}
 
       {selectedApplicationId && currentUser?.is_superuser && (
-        <Card>
+        <Card className="border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle>Caseworker Decision</CardTitle>
             <CardDescription>
@@ -835,7 +841,7 @@ function ApplicationsPage() {
       )}
 
       {selectedApplicationId && (
-        <Card>
+        <Card className="border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle>Audit Trail</CardTitle>
             <CardDescription>
@@ -853,7 +859,10 @@ function ApplicationsPage() {
                 </p>
               )}
             {auditTrailQuery.data?.events.map((event) => (
-              <div key={event.id} className="border rounded-md p-3 space-y-1">
+              <div
+                key={event.id}
+                className="bg-muted/20 border-border/60 rounded-md border p-3 space-y-1"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-medium">{event.action.replace(/_/g, " ")}</p>
                   <p className="text-xs text-muted-foreground">

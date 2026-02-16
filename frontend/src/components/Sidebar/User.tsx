@@ -28,7 +28,7 @@ function UserInfo({ fullName, email }: UserInfoProps) {
   return (
     <div className="flex items-center gap-2.5 w-full min-w-0">
       <Avatar className="size-8">
-        <AvatarFallback className="bg-zinc-600 text-white">
+        <AvatarFallback className="bg-primary/15 text-primary">
           {getInitials(fullName || "User")}
         </AvatarFallback>
       </Avatar>
@@ -62,7 +62,7 @@ export function User({ user }: { user: any }) {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground border border-transparent data-[state=open]:border-sidebar-border/60"
               data-testid="user-menu"
             >
               <UserInfo fullName={user?.full_name} email={user?.email} />
@@ -70,7 +70,7 @@ export function User({ user }: { user: any }) {
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg border-sidebar-border/60"
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}

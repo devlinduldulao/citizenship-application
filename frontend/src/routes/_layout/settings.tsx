@@ -7,9 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
 
 const tabsConfig = [
-  { value: "my-profile", title: "My profile", component: UserInformation },
+  { value: "my-profile", title: "My Profile", component: UserInformation },
   { value: "password", title: "Password", component: ChangePassword },
-  { value: "danger-zone", title: "Danger zone", component: DeleteAccount },
+  { value: "danger-zone", title: "Danger Zone", component: DeleteAccount },
 ]
 
 export const Route = createFileRoute("/_layout/settings")({
@@ -35,15 +35,18 @@ function UserSettings() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">User Settings</h1>
+      <div className="space-y-2">
+        <p className="text-muted-foreground text-xs font-medium tracking-[0.12em] uppercase">
+          Preferences
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">User Settings</h1>
         <p className="text-muted-foreground">
           Manage your account settings and preferences
         </p>
       </div>
 
-      <Tabs defaultValue="my-profile">
-        <TabsList>
+      <Tabs defaultValue="my-profile" className="bg-card border-border/60 rounded-xl border p-4 shadow-sm md:p-5">
+        <TabsList className="mb-4">
           {finalTabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.title}

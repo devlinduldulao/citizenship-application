@@ -84,10 +84,18 @@ function SignUp() {
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col gap-6"
+          className="bg-card border-border/60 space-y-6 rounded-xl border p-6 shadow-sm"
         >
-          <div className="flex flex-col items-center gap-2 text-center">
-            <h1 className="text-2xl font-bold">Create an account</h1>
+          <div className="space-y-2 text-center">
+            <p className="text-muted-foreground text-xs font-medium tracking-[0.12em] uppercase">
+              Create Account
+            </p>
+            <h1 className="text-foreground text-2xl font-semibold tracking-tight">
+              Join the platform
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Set up your account to start and track applications.
+            </p>
           </div>
 
           <div className="grid gap-4">
@@ -167,7 +175,7 @@ function SignUp() {
 
             <LoadingButton
               type="submit"
-              className="w-full"
+              className="mt-1 w-full"
               loading={signUpMutation.isPending}
             >
               Sign Up

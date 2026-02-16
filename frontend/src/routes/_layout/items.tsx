@@ -57,13 +57,18 @@ function Items() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Items</h1>
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-xs font-medium tracking-[0.12em] uppercase">
+            Inventory
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight">Items</h1>
           <p className="text-muted-foreground">Create and manage your items</p>
         </div>
         <AddItem />
       </div>
-      <ItemsTable />
+      <div className="bg-card border-border/60 rounded-xl border p-4 shadow-sm md:p-5">
+        <ItemsTable />
+      </div>
     </div>
   )
 }

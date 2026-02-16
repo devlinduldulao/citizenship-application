@@ -81,8 +81,8 @@ const UserInformation = () => {
   }
 
   return (
-    <div className="max-w-md">
-      <h3 className="text-lg font-semibold py-4">User Information</h3>
+    <div className="bg-muted/20 border-border/60 max-w-md rounded-lg border p-4">
+      <h3 className="text-lg font-semibold pb-4">User Information</h3>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
