@@ -100,6 +100,13 @@ class Settings(BaseSettings):
     # Tesseract OCR binary path (set explicitly on Windows or non-PATH installs)
     TESSERACT_CMD: str | None = None
 
+    # Optional LLM-backed case explainer settings (OpenAI-compatible API)
+    AI_EXPLAINER_BASE_URL: str | None = None
+    AI_EXPLAINER_API_KEY: str | None = None
+    AI_EXPLAINER_MODEL: str = "gpt-4.1-mini"
+    AI_EXPLAINER_TEMPERATURE: float = 0.2
+    AI_EXPLAINER_TIMEOUT_SECONDS: int = 20
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
             message = (

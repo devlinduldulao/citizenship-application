@@ -12,10 +12,12 @@ from app.models import (
     ApplicationAuditEvent,
     ApplicationAuditEventPublic,
     ApplicationAuditTrailPublic,
+    ApplicationCaseExplanationPublic,
     ApplicationDecisionBreakdownPublic,
     ApplicationDocument,
     ApplicationDocumentPublic,
     ApplicationDocumentsPublic,
+    ApplicationEvidenceRecommendationPublic,
     ApplicationProcessRequest,
     ApplicationStatus,
     CitizenshipApplication,
@@ -31,6 +33,10 @@ from app.models import (
     ReviewQueueMetricsPublic,
     ReviewQueuePublic,
     get_datetime_utc,
+)
+from app.services.case_explainer import (
+    generate_case_explanation,
+    generate_evidence_recommendations,
 )
 from app.services.nlp import (
     ExtractedEntities,
@@ -819,6 +825,96 @@ def read_application_decision_breakdown(
         confidence_score=round(confidence_score, 2),
         risk_level=get_risk_level(confidence_score=confidence_score),
         rules=[EligibilityRuleResultPublic.model_validate(rule) for rule in rules],
+    )
+
+
+@router.get(
+    "/{application_id}/case-explainer",
+    response_model=ApplicationCaseExplanationPublic,
+)
+def read_application_case_explainer(
+    session: SessionDep, current_user: CurrentUser, application_id: uuid.UUID
+) -> Any:
+    application = get_owned_application(
+        session=session, current_user=current_user, application_id=application_id
+    )
+
+    rules = session.exec(
+        select(EligibilityRuleResult)
+        .where(EligibilityRuleResult.application_id == application_id)
+        .order_by(col(EligibilityRuleResult.created_at).desc())
+    ).all()
+    documents = session.exec(
+        select(ApplicationDocument)
+        .where(ApplicationDocument.application_id == application_id)
+        .order_by(col(ApplicationDocument.created_at).desc())
+    ).all()
+    audit_events = session.exec(
+        select(ApplicationAuditEvent)
+        .where(ApplicationAuditEvent.application_id == application_id)
+        .order_by(col(ApplicationAuditEvent.created_at).desc())
+    ).all()
+
+    confidence_score = application.confidence_score or 0.0
+    risk_level = get_risk_level(confidence_score=confidence_score)
+
+    explanation = generate_case_explanation(
+        application=application,
+        rules=rules,
+        documents=documents,
+        audit_events=audit_events,
+        risk_level=risk_level,
+    )
+
+    return ApplicationCaseExplanationPublic(
+        application_id=application.id,
+        summary=explanation["summary"],
+        recommended_action=explanation["recommended_action"],
+        key_risks=explanation["key_risks"],
+        missing_evidence=explanation["missing_evidence"],
+        next_steps=explanation["next_steps"],
+        generated_by=explanation["generated_by"],
+        generated_at=get_datetime_utc(),
+    )
+
+
+@router.get(
+    "/{application_id}/evidence-recommendations",
+    response_model=ApplicationEvidenceRecommendationPublic,
+)
+def read_application_evidence_recommendations(
+    session: SessionDep, current_user: CurrentUser, application_id: uuid.UUID
+) -> Any:
+    application = get_owned_application(
+        session=session, current_user=current_user, application_id=application_id
+    )
+
+    rules = session.exec(
+        select(EligibilityRuleResult)
+        .where(EligibilityRuleResult.application_id == application_id)
+        .order_by(col(EligibilityRuleResult.created_at).desc())
+    ).all()
+    documents = session.exec(
+        select(ApplicationDocument)
+        .where(ApplicationDocument.application_id == application_id)
+        .order_by(col(ApplicationDocument.created_at).desc())
+    ).all()
+
+    confidence_score = application.confidence_score or 0.0
+    risk_level = get_risk_level(confidence_score=confidence_score)
+    recommendations = generate_evidence_recommendations(
+        rules=rules,
+        documents=documents,
+        risk_level=risk_level,
+    )
+
+    return ApplicationEvidenceRecommendationPublic(
+        application_id=application.id,
+        recommended_document_types=recommendations["recommended_document_types"],
+        rationale_by_document_type=recommendations["rationale_by_document_type"],
+        recommended_next_actions=recommendations["recommended_next_actions"],
+        generated_by=recommendations["generated_by"],
+        generated_at=get_datetime_utc(),
     )
 
 

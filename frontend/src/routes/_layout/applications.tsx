@@ -3,6 +3,12 @@ import { createFileRoute } from "@tanstack/react-router"
 import { LoaderCircle, Upload } from "lucide-react"
 import { useMemo, useState } from "react"
 
+import {
+  type ApplicationStatus,
+  ApplicationsService,
+  type CitizenshipApplicationCreate,
+  type ReviewDecisionAction,
+} from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,181 +24,7 @@ import { Label } from "@/components/ui/label"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 
-type ApplicationStatus =
-  | "draft"
-  | "documents_uploaded"
-  | "queued"
-  | "processing"
-  | "review_ready"
-  | "approved"
-  | "rejected"
-  | "more_info_required"
-
-type DocumentStatus = "uploaded" | "processing" | "processed" | "failed"
-
-interface CitizenshipApplication {
-  id: string
-  applicant_full_name: string
-  applicant_nationality: string
-  notes?: string | null
-  status: ApplicationStatus
-  recommendation_summary?: string | null
-  confidence_score?: number | null
-  priority_score?: number
-  sla_due_at?: string | null
-  created_at?: string | null
-}
-
-interface CitizenshipApplicationList {
-  data: CitizenshipApplication[]
-  count: number
-}
-
-interface ApplicationDocument {
-  id: string
-  application_id: string
-  document_type: string
-  original_filename: string
-  status: DocumentStatus
-  file_size_bytes: number
-}
-
-interface ApplicationDocumentList {
-  data: ApplicationDocument[]
-  count: number
-}
-
-interface EligibilityRuleResult {
-  id: string
-  rule_code: string
-  rule_name: string
-  passed: boolean
-  score: number
-  weight: number
-  rationale: string
-  evidence: Record<string, unknown>
-}
-
-interface DecisionBreakdown {
-  application_id: string
-  recommendation: string
-  confidence_score: number
-  risk_level: string
-  rules: EligibilityRuleResult[]
-}
-
-interface ApplicationAuditEvent {
-  id: string
-  action: string
-  reason?: string | null
-  event_metadata: Record<string, unknown>
-  actor_user_id?: string | null
-  created_at?: string | null
-}
-
-interface ApplicationAuditTrail {
-  application_id: string
-  events: ApplicationAuditEvent[]
-}
-
-interface ReviewQueueItem {
-  id: string
-  applicant_full_name: string
-  applicant_nationality: string
-  status: ApplicationStatus
-  recommendation_summary?: string | null
-  confidence_score?: number | null
-  risk_level: string
-  priority_score: number
-  sla_due_at?: string | null
-  is_overdue: boolean
-}
-
-interface ReviewQueueResponse {
-  data: ReviewQueueItem[]
-  count: number
-}
-
-interface ReviewQueueMetrics {
-  pending_manual_count: number
-  overdue_count: number
-  high_priority_count: number
-  avg_waiting_days: number
-  daily_manual_capacity: number
-  estimated_days_to_clear_backlog: number
-}
-
-type ReviewAction = "approve" | "reject" | "request_more_info"
-
-const API_BASE = import.meta.env.VITE_API_URL
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
-})
-
-const fetchJson = async <T,>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      ...(init?.headers || {}),
-      ...getAuthHeaders(),
-    },
-  })
-
-  if (!response.ok) {
-    const body = await response
-      .json()
-      .catch(() => ({ detail: "Request failed" }))
-    throw new Error(body.detail || "Request failed")
-  }
-
-  return response.json() as Promise<T>
-}
-
-const createApplication = async (payload: {
-  applicant_full_name: string
-  applicant_nationality: string
-  notes?: string
-}) => {
-  return fetchJson<CitizenshipApplication>("/api/v1/applications/", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  })
-}
-
-const uploadDocument = async (payload: {
-  applicationId: string
-  documentType: string
-  file: File
-}) => {
-  const formData = new FormData()
-  formData.append("document_type", payload.documentType)
-  formData.append("file", payload.file)
-
-  return fetchJson<ApplicationDocument>(
-    `/api/v1/applications/${payload.applicationId}/documents`,
-    {
-      method: "POST",
-      body: formData,
-    },
-  )
-}
-
-const queueProcessing = async (applicationId: string) => {
-  return fetchJson<CitizenshipApplication>(
-    `/api/v1/applications/${applicationId}/process`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ force_reprocess: false }),
-    },
-  )
-}
+type ReviewAction = ReviewDecisionAction
 
 const getStatusBadgeVariant = (status: ApplicationStatus) => {
   if (status === "approved") return "default"
@@ -228,57 +60,70 @@ function ApplicationsPage() {
 
   const reviewQueueQuery = useQuery({
     queryKey: ["review-queue"],
-    queryFn: () =>
-      fetchJson<ReviewQueueResponse>(
-        "/api/v1/applications/queue/review?skip=0&limit=5",
-      ),
+    queryFn: () => ApplicationsService.readReviewQueue({ skip: 0, limit: 5 }),
     enabled: Boolean(currentUser?.is_superuser),
   })
 
   const reviewQueueMetricsQuery = useQuery({
     queryKey: ["review-queue-metrics"],
-    queryFn: () =>
-      fetchJson<ReviewQueueMetrics>("/api/v1/applications/queue/metrics"),
+    queryFn: () => ApplicationsService.readReviewQueueMetrics({}),
     enabled: Boolean(currentUser?.is_superuser),
   })
 
   const applicationsQuery = useQuery({
     queryKey: ["citizenship-applications"],
     queryFn: () =>
-      fetchJson<CitizenshipApplicationList>(
-        "/api/v1/applications/?skip=0&limit=100",
-      ),
+      ApplicationsService.readApplications({ skip: 0, limit: 100 }),
   })
 
   const documentsQuery = useQuery({
     queryKey: ["application-documents", selectedApplicationId],
     queryFn: () =>
-      fetchJson<ApplicationDocumentList>(
-        `/api/v1/applications/${selectedApplicationId}/documents`,
-      ),
+      ApplicationsService.readApplicationDocuments({
+        applicationId: selectedApplicationId,
+      }),
     enabled: Boolean(selectedApplicationId),
   })
 
   const breakdownQuery = useQuery({
     queryKey: ["application-breakdown", selectedApplicationId],
     queryFn: () =>
-      fetchJson<DecisionBreakdown>(
-        `/api/v1/applications/${selectedApplicationId}/decision-breakdown`,
-      ),
+      ApplicationsService.readApplicationDecisionBreakdown({
+        applicationId: selectedApplicationId,
+      }),
     enabled: Boolean(selectedApplicationId),
   })
 
   const auditTrailQuery = useQuery({
     queryKey: ["application-audit-trail", selectedApplicationId],
     queryFn: () =>
-      fetchJson<ApplicationAuditTrail>(
-        `/api/v1/applications/${selectedApplicationId}/audit-trail`,
-      ),
+      ApplicationsService.readApplicationAuditTrail({
+        applicationId: selectedApplicationId,
+      }),
+    enabled: Boolean(selectedApplicationId),
+  })
+
+  const caseExplainerQuery = useQuery({
+    queryKey: ["application-case-explainer", selectedApplicationId],
+    queryFn: () =>
+      ApplicationsService.readApplicationCaseExplainer({
+        applicationId: selectedApplicationId,
+      }),
+    enabled: Boolean(selectedApplicationId),
+  })
+
+  const evidenceRecommendationsQuery = useQuery({
+    queryKey: ["application-evidence-recommendations", selectedApplicationId],
+    queryFn: () =>
+      ApplicationsService.readApplicationEvidenceRecommendations({
+        applicationId: selectedApplicationId,
+      }),
     enabled: Boolean(selectedApplicationId),
   })
 
   const createMutation = useMutation({
-    mutationFn: createApplication,
+    mutationFn: (requestBody: CitizenshipApplicationCreate) =>
+      ApplicationsService.createApplication({ requestBody }),
     onSuccess: (application) => {
       showSuccessToast("Application created successfully")
       setApplicantFullName("")
@@ -293,7 +138,18 @@ function ApplicationsPage() {
   })
 
   const uploadMutation = useMutation({
-    mutationFn: uploadDocument,
+    mutationFn: (payload: {
+      applicationId: string
+      documentType: string
+      file: File
+    }) =>
+      ApplicationsService.uploadApplicationDocument({
+        applicationId: payload.applicationId,
+        formData: {
+          document_type: payload.documentType,
+          file: payload.file,
+        },
+      }),
     onSuccess: () => {
       showSuccessToast("Document uploaded")
       setDocumentType("")
@@ -312,7 +168,11 @@ function ApplicationsPage() {
   })
 
   const processMutation = useMutation({
-    mutationFn: queueProcessing,
+    mutationFn: (applicationId: string) =>
+      ApplicationsService.queueApplicationProcessing({
+        applicationId,
+        requestBody: { force_reprocess: false },
+      }),
     onSuccess: () => {
       showSuccessToast("Processing queued")
       queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
@@ -335,19 +195,13 @@ function ApplicationsPage() {
       action: ReviewAction
       reason: string
     }) =>
-      fetchJson<CitizenshipApplication>(
-        `/api/v1/applications/${payload.applicationId}/review-decision`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: payload.action,
-            reason: payload.reason,
-          }),
+      ApplicationsService.submitReviewDecision({
+        applicationId: payload.applicationId,
+        requestBody: {
+          action: payload.action,
+          reason: payload.reason,
         },
-      ),
+      }),
     onSuccess: () => {
       showSuccessToast("Caseworker decision saved")
       setReviewReason("")
@@ -702,11 +556,10 @@ function ApplicationsPage() {
             <button
               type="button"
               key={application.id}
-              className={`w-full text-left rounded-md border p-4 flex flex-col gap-2 transition-colors cursor-pointer ${
-                selectedApplicationId === application.id
+              className={`w-full text-left rounded-md border p-4 flex flex-col gap-2 transition-colors cursor-pointer ${selectedApplicationId === application.id
                   ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                   : "bg-muted/20 border-border/60 hover:border-primary/40 hover:bg-muted/40"
-              }`}
+                }`}
               onClick={() => setSelectedApplicationId(application.id)}
             >
               <div className="flex items-center justify-between gap-3">
@@ -773,6 +626,160 @@ function ApplicationsPage() {
                 </Badge>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedApplicationId && (
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader>
+            <CardTitle>AI Evidence Recommendations</CardTitle>
+            <CardDescription>
+              Targeted document and action suggestions to improve decision
+              confidence.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {evidenceRecommendationsQuery.isLoading && (
+              <p className="text-sm text-muted-foreground">
+                Generating evidence recommendations...
+              </p>
+            )}
+
+            {!evidenceRecommendationsQuery.isLoading &&
+              evidenceRecommendationsQuery.data && (
+                <>
+                  <div className="bg-muted/20 border-border/60 rounded-md border p-4 space-y-3">
+                    <p className="text-sm font-medium">
+                      Recommended document types
+                    </p>
+                    {evidenceRecommendationsQuery.data
+                      .recommended_document_types.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          No additional high-impact document types suggested at
+                          this stage.
+                        </p>
+                      )}
+                    <div className="flex flex-wrap gap-2">
+                      {evidenceRecommendationsQuery.data.recommended_document_types.map(
+                        (documentType) => (
+                          <Badge key={documentType} variant="secondary">
+                            {documentType}
+                          </Badge>
+                        ),
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Generated by{" "}
+                      {evidenceRecommendationsQuery.data.generated_by}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="bg-muted/20 border-border/60 rounded-md border p-3 space-y-2">
+                      <p className="text-sm font-medium">Document rationale</p>
+                      {Object.entries(
+                        evidenceRecommendationsQuery.data
+                          .rationale_by_document_type,
+                      ).map(([documentType, rationale]) => (
+                        <p
+                          key={documentType}
+                          className="text-sm text-muted-foreground"
+                        >
+                          <span className="font-medium text-foreground">
+                            {documentType}:
+                          </span>
+                          {rationale}
+                        </p>
+                      ))}
+                    </div>
+
+                    <div className="bg-muted/20 border-border/60 rounded-md border p-3 space-y-2">
+                      <p className="text-sm font-medium">
+                        Recommended next actions
+                      </p>
+                      {evidenceRecommendationsQuery.data.recommended_next_actions.map(
+                        (action) => (
+                          <p
+                            key={action}
+                            className="text-sm text-muted-foreground"
+                          >
+                            • {action}
+                          </p>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedApplicationId && (
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader>
+            <CardTitle>AI Case Explainer</CardTitle>
+            <CardDescription>
+              Decision memo draft generated from rules, documents, and audit
+              context.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {caseExplainerQuery.isLoading && (
+              <p className="text-sm text-muted-foreground">
+                Generating explanation...
+              </p>
+            )}
+
+            {!caseExplainerQuery.isLoading && caseExplainerQuery.data && (
+              <>
+                <div className="bg-muted/20 border-border/60 rounded-md border p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium">Recommended action</p>
+                    <Badge variant="secondary">
+                      {caseExplainerQuery.data.recommended_action.replace(
+                        /_/g,
+                        " ",
+                      )}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {caseExplainerQuery.data.summary}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Generated by {caseExplainerQuery.data.generated_by}
+                  </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="bg-muted/20 border-border/60 rounded-md border p-3 space-y-2">
+                    <p className="text-sm font-medium">Key risks</p>
+                    {caseExplainerQuery.data.key_risks.map((risk) => (
+                      <p key={risk} className="text-sm text-muted-foreground">
+                        • {risk}
+                      </p>
+                    ))}
+                  </div>
+                  <div className="bg-muted/20 border-border/60 rounded-md border p-3 space-y-2">
+                    <p className="text-sm font-medium">Missing evidence</p>
+                    {caseExplainerQuery.data.missing_evidence.map((gap) => (
+                      <p key={gap} className="text-sm text-muted-foreground">
+                        • {gap}
+                      </p>
+                    ))}
+                  </div>
+                  <div className="bg-muted/20 border-border/60 rounded-md border p-3 space-y-2">
+                    <p className="text-sm font-medium">Next steps</p>
+                    {caseExplainerQuery.data.next_steps.map((step) => (
+                      <p key={step} className="text-sm text-muted-foreground">
+                        • {step}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

@@ -361,6 +361,26 @@ class ApplicationDecisionBreakdownPublic(SQLModel):
     rules: list[EligibilityRuleResultPublic]
 
 
+class ApplicationCaseExplanationPublic(SQLModel):
+    application_id: uuid.UUID
+    summary: str = Field(min_length=1, max_length=3000)
+    recommended_action: str = Field(min_length=1, max_length=64)
+    key_risks: list[str]
+    missing_evidence: list[str]
+    next_steps: list[str]
+    generated_by: str = Field(min_length=1, max_length=128)
+    generated_at: datetime | None = None
+
+
+class ApplicationEvidenceRecommendationPublic(SQLModel):
+    application_id: uuid.UUID
+    recommended_document_types: list[str]
+    rationale_by_document_type: dict[str, str]
+    recommended_next_actions: list[str]
+    generated_by: str = Field(min_length=1, max_length=128)
+    generated_at: datetime | None = None
+
+
 class ApplicationAuditEventBase(SQLModel):
     action: str = Field(min_length=1, max_length=64)
     reason: str | None = Field(default=None, max_length=1000)

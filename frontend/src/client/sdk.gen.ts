@@ -3,7 +3,281 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, PrivateCreateUserData, PrivateCreateUserResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
+import type { ApplicationsCreateApplicationData, ApplicationsCreateApplicationResponse, ApplicationsReadApplicationsData, ApplicationsReadApplicationsResponse, ApplicationsReadReviewQueueData, ApplicationsReadReviewQueueResponse, ApplicationsReadReviewQueueMetricsData, ApplicationsReadReviewQueueMetricsResponse, ApplicationsReadApplicationData, ApplicationsReadApplicationResponse, ApplicationsUploadApplicationDocumentData, ApplicationsUploadApplicationDocumentResponse, ApplicationsReadApplicationDocumentsData, ApplicationsReadApplicationDocumentsResponse, ApplicationsQueueApplicationProcessingData, ApplicationsQueueApplicationProcessingResponse, ApplicationsReadApplicationDecisionBreakdownData, ApplicationsReadApplicationDecisionBreakdownResponse, ApplicationsReadApplicationCaseExplainerData, ApplicationsReadApplicationCaseExplainerResponse, ApplicationsReadApplicationEvidenceRecommendationsData, ApplicationsReadApplicationEvidenceRecommendationsResponse, ApplicationsSubmitReviewDecisionData, ApplicationsSubmitReviewDecisionResponse, ApplicationsReadApplicationAuditTrailData, ApplicationsReadApplicationAuditTrailResponse, ItemsReadItemsData, ItemsReadItemsResponse, ItemsCreateItemData, ItemsCreateItemResponse, ItemsReadItemData, ItemsReadItemResponse, ItemsUpdateItemData, ItemsUpdateItemResponse, ItemsDeleteItemData, ItemsDeleteItemResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, PrivateCreateUserData, PrivateCreateUserResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse } from './types.gen';
+
+export class ApplicationsService {
+    /**
+     * Create Application
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns CitizenshipApplicationPublic Successful Response
+     * @throws ApiError
+     */
+    public static createApplication(data: ApplicationsCreateApplicationData): CancelablePromise<ApplicationsCreateApplicationResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/applications/',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Applications
+     * @param data The data for the request.
+     * @param data.skip
+     * @param data.limit
+     * @returns CitizenshipApplicationsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readApplications(data: ApplicationsReadApplicationsData = {}): CancelablePromise<ApplicationsReadApplicationsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/applications/',
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Review Queue
+     * @param data The data for the request.
+     * @param data.skip
+     * @param data.limit
+     * @returns ReviewQueuePublic Successful Response
+     * @throws ApiError
+     */
+    public static readReviewQueue(data: ApplicationsReadReviewQueueData = {}): CancelablePromise<ApplicationsReadReviewQueueResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/applications/queue/review',
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Review Queue Metrics
+     * @param data The data for the request.
+     * @param data.dailyManualCapacity
+     * @returns ReviewQueueMetricsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readReviewQueueMetrics(data: ApplicationsReadReviewQueueMetricsData = {}): CancelablePromise<ApplicationsReadReviewQueueMetricsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/applications/queue/metrics',
+            query: {
+                daily_manual_capacity: data.dailyManualCapacity
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Application
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @returns CitizenshipApplicationPublic Successful Response
+     * @throws ApiError
+     */
+    public static readApplication(data: ApplicationsReadApplicationData): CancelablePromise<ApplicationsReadApplicationResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/applications/{application_id}',
+            path: {
+                application_id: data.applicationId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Upload Application Document
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @param data.formData
+     * @returns ApplicationDocumentPublic Successful Response
+     * @throws ApiError
+     */
+    public static uploadApplicationDocument(data: ApplicationsUploadApplicationDocumentData): CancelablePromise<ApplicationsUploadApplicationDocumentResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/applications/{application_id}/documents',
+            path: {
+                application_id: data.applicationId
+            },
+            formData: data.formData,
+            mediaType: 'multipart/form-data',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Application Documents
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @returns ApplicationDocumentsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readApplicationDocuments(data: ApplicationsReadApplicationDocumentsData): CancelablePromise<ApplicationsReadApplicationDocumentsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/applications/{application_id}/documents',
+            path: {
+                application_id: data.applicationId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Queue Application Processing
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @param data.requestBody
+     * @returns CitizenshipApplicationPublic Successful Response
+     * @throws ApiError
+     */
+    public static queueApplicationProcessing(data: ApplicationsQueueApplicationProcessingData): CancelablePromise<ApplicationsQueueApplicationProcessingResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/applications/{application_id}/process',
+            path: {
+                application_id: data.applicationId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Application Decision Breakdown
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @returns ApplicationDecisionBreakdownPublic Successful Response
+     * @throws ApiError
+     */
+    public static readApplicationDecisionBreakdown(data: ApplicationsReadApplicationDecisionBreakdownData): CancelablePromise<ApplicationsReadApplicationDecisionBreakdownResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/applications/{application_id}/decision-breakdown',
+            path: {
+                application_id: data.applicationId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Application Case Explainer
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @returns ApplicationCaseExplanationPublic Successful Response
+     * @throws ApiError
+     */
+    public static readApplicationCaseExplainer(data: ApplicationsReadApplicationCaseExplainerData): CancelablePromise<ApplicationsReadApplicationCaseExplainerResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/applications/{application_id}/case-explainer',
+            path: {
+                application_id: data.applicationId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Application Evidence Recommendations
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @returns ApplicationEvidenceRecommendationPublic Successful Response
+     * @throws ApiError
+     */
+    public static readApplicationEvidenceRecommendations(data: ApplicationsReadApplicationEvidenceRecommendationsData): CancelablePromise<ApplicationsReadApplicationEvidenceRecommendationsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/applications/{application_id}/evidence-recommendations',
+            path: {
+                application_id: data.applicationId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Submit Review Decision
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @param data.requestBody
+     * @returns CitizenshipApplicationPublic Successful Response
+     * @throws ApiError
+     */
+    public static submitReviewDecision(data: ApplicationsSubmitReviewDecisionData): CancelablePromise<ApplicationsSubmitReviewDecisionResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/applications/{application_id}/review-decision',
+            path: {
+                application_id: data.applicationId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Application Audit Trail
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @returns ApplicationAuditTrailPublic Successful Response
+     * @throws ApiError
+     */
+    public static readApplicationAuditTrail(data: ApplicationsReadApplicationAuditTrailData): CancelablePromise<ApplicationsReadApplicationAuditTrailResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/applications/{application_id}/audit-trail',
+            path: {
+                application_id: data.applicationId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
 
 export class ItemsService {
     /**

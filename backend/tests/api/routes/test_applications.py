@@ -240,3 +240,109 @@ def test_review_queue_and_metrics_for_superuser(
     metrics_content = queue_metrics_response.json()
     assert metrics_content["pending_manual_count"] >= 1
     assert "estimated_days_to_clear_backlog" in metrics_content
+
+
+def test_case_explainer_endpoint_returns_structured_response(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+) -> None:
+    create_response = client.post(
+        f"{settings.API_V1_STR}/applications/",
+        headers=normal_user_token_headers,
+        json={
+            "applicant_full_name": "Explainer Candidate",
+            "applicant_nationality": "Somali",
+            "notes": "Need AI explainer summary",
+        },
+    )
+    assert create_response.status_code == 200
+    application_id = create_response.json()["id"]
+
+    explainer_response = client.get(
+        f"{settings.API_V1_STR}/applications/{application_id}/case-explainer",
+        headers=normal_user_token_headers,
+    )
+
+    assert explainer_response.status_code == 200
+    content = explainer_response.json()
+    assert content["application_id"] == application_id
+    assert isinstance(content["summary"], str)
+    assert isinstance(content["recommended_action"], str)
+    assert isinstance(content["key_risks"], list)
+    assert isinstance(content["missing_evidence"], list)
+    assert isinstance(content["next_steps"], list)
+    assert isinstance(content["generated_by"], str)
+
+
+def test_case_explainer_allows_superuser_access(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    superuser_token_headers: dict[str, str],
+) -> None:
+    create_response = client.post(
+        f"{settings.API_V1_STR}/applications/",
+        headers=normal_user_token_headers,
+        json={
+            "applicant_full_name": "Ownership Check",
+            "applicant_nationality": "Norwegian",
+        },
+    )
+    assert create_response.status_code == 200
+    application_id = create_response.json()["id"]
+
+    superuser_response = client.get(
+        f"{settings.API_V1_STR}/applications/{application_id}/case-explainer",
+        headers=superuser_token_headers,
+    )
+    assert superuser_response.status_code == 200
+
+
+def test_evidence_recommendations_endpoint_returns_expected_shape(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+) -> None:
+    create_response = client.post(
+        f"{settings.API_V1_STR}/applications/",
+        headers=normal_user_token_headers,
+        json={
+            "applicant_full_name": "Evidence Candidate",
+            "applicant_nationality": "Nepali",
+            "notes": "Need targeted evidence suggestions",
+        },
+    )
+    assert create_response.status_code == 200
+    application_id = create_response.json()["id"]
+
+    upload_response = client.post(
+        f"{settings.API_V1_STR}/applications/{application_id}/documents",
+        headers=normal_user_token_headers,
+        data={"document_type": "passport"},
+        files={
+            "file": (
+                "passport.pdf",
+                b"%PDF-1.4 evidence candidate",
+                "application/pdf",
+            )
+        },
+    )
+    assert upload_response.status_code == 200
+
+    process_response = client.post(
+        f"{settings.API_V1_STR}/applications/{application_id}/process",
+        headers=normal_user_token_headers,
+        json={"force_reprocess": False},
+    )
+    assert process_response.status_code == 200
+
+    recommendation_response = client.get(
+        f"{settings.API_V1_STR}/applications/{application_id}/evidence-recommendations",
+        headers=normal_user_token_headers,
+    )
+    assert recommendation_response.status_code == 200
+    content = recommendation_response.json()
+
+    assert content["application_id"] == application_id
+    assert isinstance(content["recommended_document_types"], list)
+    assert isinstance(content["rationale_by_document_type"], dict)
+    assert isinstance(content["recommended_next_actions"], list)
+    assert isinstance(content["generated_by"], str)

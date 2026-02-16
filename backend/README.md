@@ -43,6 +43,7 @@ Both are optional — the system degrades gracefully to PyMuPDF (digital PDFs) a
 - Auth and user management (`/login`, `/users`)
 - Applications and documents (`/applications`)
 - Automated pre-screening + decision breakdown (`/applications/{id}/decision-breakdown`)
+- AI case memo + evidence recommendations (`/applications/{id}/case-explainer`, `/applications/{id}/evidence-recommendations`)
 - Caseworker actions + audit (`/applications/{id}/review-decision`, `/applications/{id}/audit-trail`)
 - Reviewer workload queue + SLA metrics (`/applications/queue/review`, `/applications/queue/metrics`)
 

@@ -58,6 +58,8 @@ These APIs support reviewer workload balancing and operational monitoring.
 
 - `GET /api/v1/applications/queue/review` (superuser): returns prioritized manual-review queue items with fields including `priority_score`, `sla_due_at`, and `is_overdue`.
 - `GET /api/v1/applications/queue/metrics` (superuser): returns aggregate workload metrics.
+- `GET /api/v1/applications/{application_id}/case-explainer`: returns AI-assisted case memo (`summary`, `recommended_action`, `key_risks`, `missing_evidence`, `next_steps`) with optional LLM generation and rules-based fallback.
+- `GET /api/v1/applications/{application_id}/evidence-recommendations`: returns AI-guided missing-document recommendations and next actions.
 
 Metric interpretation:
 
@@ -121,6 +123,20 @@ Each document receives an NLP score (0–1) based on entity richness across cate
 | Residency duration signal | 0.05 | Case notes + NLP residency signals combined |
 
 Every rule includes a human-readable rationale and full evidence payload so reviewers can verify the system's reasoning.
+
+## Where AI is applied now
+
+- **Document understanding:** OCR + NLP extraction for uploaded evidence.
+- **Case narrative generation:** `case-explainer` endpoint produces a reviewer-ready case memo with fallback behavior if LLM is unavailable.
+- **Evidence gap recommendations:** `evidence-recommendations` endpoint suggests high-impact missing document types and next actions.
+- **Human-in-the-loop controls:** AI outputs are advisory; final decisions remain caseworker-owned and auditable.
+
+## AI expansion opportunities
+
+- Reviewer copilot Q&A over rules, documents, and audit events.
+- Backlog risk forecasting (`likely_more_info_required`, SLA breach prediction).
+- Cross-document anomaly detection for identity/residency inconsistencies.
+- Multilingual summarization and translation assistance for reviewer notes.
 
 ## Testing with sample documents
 
@@ -229,6 +245,14 @@ uv pip install https://github.com/explosion/spacy-models/releases/download/nb_co
 # Verify both work:
 uv run python -c "import pytesseract; print(pytesseract.get_tesseract_version())"
 uv run python -c "import spacy; nlp = spacy.load('nb_core_news_sm'); print('spaCy OK')"
+
+# Verify using app config path (recommended on Windows when Tesseract is not on PATH):
+uv run python -c "from app.core.config import settings; import pytesseract; pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD or pytesseract.pytesseract.tesseract_cmd; print(pytesseract.get_tesseract_version())"
+
+# Optional: enable LLM-backed case explainer (OpenAI-compatible API)
+# AI_EXPLAINER_BASE_URL=https://api.openai.com/v1
+# AI_EXPLAINER_API_KEY=your_api_key
+# AI_EXPLAINER_MODEL=gpt-4.1-mini
 ```
 
 > **Note:** Both Tesseract and spaCy are optional. The system degrades gracefully:
@@ -351,6 +375,7 @@ Deployment guidance: [deployment.md](./deployment.md)
 - [Release Notes](./release-notes.md)
 - [Contributing](./CONTRIBUTING.md)
 - [Security Policy](./SECURITY.md)
+- [Roadmap](./ROADMAP.md)
 
 ## License
 

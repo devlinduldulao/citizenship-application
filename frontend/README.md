@@ -71,6 +71,22 @@ bun run generate-client
 
 Notice that everytime the backend changes (changing the OpenAPI schema), you should follow these steps again to update the frontend client.
 
+## API Call Guard (Generated Client Only)
+
+To prevent drift from the OpenAPI contract, frontend source code under `src/` is guarded against:
+
+* direct `fetch(...)` calls
+* direct `axios(...)` calls
+* hardcoded `"/api/v1/..."` paths
+
+The guard runs automatically as part of `bun run lint` via:
+
+```bash
+bun run check:api-client
+```
+
+Only generated client files in `src/client/` are allowed to contain direct HTTP implementation details.
+
 ## Code Structure
 
 The frontend code is structured as follows:
