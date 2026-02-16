@@ -692,10 +692,22 @@ function ApplicationsPage() {
             </p>
           )}
 
+          {!applicationsQuery.isLoading && sortedApplications.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Click an application to select it for document upload and review.
+            </p>
+          )}
+
           {sortedApplications.map((application) => (
-            <div
+            <button
+              type="button"
               key={application.id}
-              className="bg-muted/20 border-border/60 rounded-md border p-4 flex flex-col gap-2"
+              className={`w-full text-left rounded-md border p-4 flex flex-col gap-2 transition-colors cursor-pointer ${
+                selectedApplicationId === application.id
+                  ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                  : "bg-muted/20 border-border/60 hover:border-primary/40 hover:bg-muted/40"
+              }`}
+              onClick={() => setSelectedApplicationId(application.id)}
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -716,7 +728,7 @@ function ApplicationsPage() {
                   {application.recommendation_summary}
                 </p>
               )}
-            </div>
+            </button>
           ))}
         </CardContent>
       </Card>
