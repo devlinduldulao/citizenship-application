@@ -87,3 +87,15 @@ def test_upload_and_process_application(
     documents_content = documents_response.json()
     assert documents_content["count"] == 1
     assert documents_content["data"][0]["document_type"] == "passport"
+
+    breakdown_response = client.get(
+        f"{settings.API_V1_STR}/applications/{application_id}/decision-breakdown",
+        headers=normal_user_token_headers,
+    )
+    assert breakdown_response.status_code == 200
+    breakdown_content = breakdown_response.json()
+    assert breakdown_content["application_id"] == application_id
+    assert "recommendation" in breakdown_content
+    assert "risk_level" in breakdown_content
+    assert isinstance(breakdown_content["rules"], list)
+    assert len(breakdown_content["rules"]) > 0

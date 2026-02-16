@@ -169,6 +169,9 @@ class CitizenshipApplication(CitizenshipApplicationBase, table=True):
     documents: list["ApplicationDocument"] = Relationship(
         back_populates="application", cascade_delete=True
     )
+    rule_results: list["EligibilityRuleResult"] = Relationship(
+        back_populates="application", cascade_delete=True
+    )
 
 
 class CitizenshipApplicationPublic(CitizenshipApplicationBase):
@@ -242,6 +245,46 @@ class ApplicationDocumentsPublic(SQLModel):
 
 class ApplicationProcessRequest(SQLModel):
     force_reprocess: bool = False
+
+
+class EligibilityRuleResultBase(SQLModel):
+    rule_code: str = Field(min_length=1, max_length=64)
+    rule_name: str = Field(min_length=1, max_length=255)
+    passed: bool
+    score: float = Field(ge=0, le=1)
+    weight: float = Field(ge=0, le=1)
+    rationale: str = Field(min_length=1, max_length=1000)
+
+
+class EligibilityRuleResult(EligibilityRuleResultBase, table=True):
+    __tablename__ = "eligibility_rule_result"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    evidence: dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    application_id: uuid.UUID = Field(
+        foreign_key="citizenship_application.id", nullable=False, ondelete="CASCADE"
+    )
+
+    application: CitizenshipApplication | None = Relationship(back_populates="rule_results")
+
+
+class EligibilityRuleResultPublic(EligibilityRuleResultBase):
+    id: uuid.UUID
+    evidence: dict[str, Any]
+    created_at: datetime | None = None
+    application_id: uuid.UUID
+
+
+class ApplicationDecisionBreakdownPublic(SQLModel):
+    application_id: uuid.UUID
+    recommendation: str
+    confidence_score: float = Field(ge=0, le=1)
+    risk_level: str = Field(min_length=1, max_length=32)
+    rules: list[EligibilityRuleResultPublic]
 
 
 # Generic message

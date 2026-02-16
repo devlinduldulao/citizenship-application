@@ -56,6 +56,25 @@ interface ApplicationDocumentList {
   count: number
 }
 
+interface EligibilityRuleResult {
+  id: string
+  rule_code: string
+  rule_name: string
+  passed: boolean
+  score: number
+  weight: number
+  rationale: string
+  evidence: Record<string, unknown>
+}
+
+interface DecisionBreakdown {
+  application_id: string
+  recommendation: string
+  confidence_score: number
+  risk_level: string
+  rules: EligibilityRuleResult[]
+}
+
 const API_BASE = import.meta.env.VITE_API_URL
 
 const getAuthHeaders = () => ({
@@ -166,6 +185,15 @@ function ApplicationsPage() {
     enabled: Boolean(selectedApplicationId),
   })
 
+  const breakdownQuery = useQuery({
+    queryKey: ["application-breakdown", selectedApplicationId],
+    queryFn: () =>
+      fetchJson<DecisionBreakdown>(
+        `/api/v1/applications/${selectedApplicationId}/decision-breakdown`,
+      ),
+    enabled: Boolean(selectedApplicationId),
+  })
+
   const createMutation = useMutation({
     mutationFn: createApplication,
     onSuccess: (application) => {
@@ -189,6 +217,9 @@ function ApplicationsPage() {
       queryClient.invalidateQueries({
         queryKey: ["application-documents", selectedApplicationId],
       })
+      queryClient.invalidateQueries({
+        queryKey: ["application-breakdown", selectedApplicationId],
+      })
     },
     onError: (error: Error) => showErrorToast(error.message),
   })
@@ -200,6 +231,9 @@ function ApplicationsPage() {
       queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
       queryClient.invalidateQueries({
         queryKey: ["application-documents", selectedApplicationId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["application-breakdown", selectedApplicationId],
       })
     },
     onError: (error: Error) => showErrorToast(error.message),
@@ -473,6 +507,77 @@ function ApplicationsPage() {
                 </Badge>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedApplicationId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Decision Explainability</CardTitle>
+            <CardDescription>
+              Rule-by-rule scoring and recommendation rationale for reviewers.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {breakdownQuery.isLoading && (
+              <p className="text-sm text-muted-foreground">
+                Loading decision breakdown...
+              </p>
+            )}
+
+            {!breakdownQuery.isLoading && breakdownQuery.data && (
+              <>
+                <div className="border rounded-md p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">Overall confidence</p>
+                    <Badge variant="secondary">
+                      {(breakdownQuery.data.confidence_score * 100).toFixed(0)}%
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">Risk level</p>
+                    <Badge
+                      variant={
+                        breakdownQuery.data.risk_level === "high"
+                          ? "destructive"
+                          : "outline"
+                      }
+                    >
+                      {breakdownQuery.data.risk_level}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {breakdownQuery.data.recommendation}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {breakdownQuery.data.rules.map((rule) => (
+                    <div
+                      key={rule.id}
+                      className="border rounded-md p-3 flex flex-col gap-2"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-medium">{rule.rule_name}</p>
+                        <Badge
+                          variant={rule.passed ? "default" : "destructive"}
+                        >
+                          {rule.passed ? "passed" : "failed"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {rule.rationale}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Score: {(rule.score * 100).toFixed(0)}% · Weight: {" "}
+                        {(rule.weight * 100).toFixed(0)}%
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
