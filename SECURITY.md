@@ -1,29 +1,38 @@
 # Security Policy
 
-Security is very important for this project and its community. 🔒
+Security issues are taken seriously in this project.
 
-Learn more about it below. 👇
+## Supported versions
 
-## Versions
+The `main` branch is the actively maintained branch. Security fixes are prioritized there.
 
-The latest version or release is supported.
+## Reporting a vulnerability
 
-You are encouraged to write tests for your application and update your versions frequently after ensuring that your tests are passing. This way you will benefit from the latest features, bug fixes, and **security fixes**.
+Please do **not** open a public GitHub issue for suspected vulnerabilities.
 
-## Reporting a Vulnerability
+Use GitHub's private vulnerability reporting for this repository (Security Advisories / "Report a vulnerability") and include:
 
-If you think you found a vulnerability, and even if you are not sure about it, please report it right away by sending an email to: security@tiangolo.com. Please try to be as explicit as possible, describing all the steps and example code to reproduce the security issue.
+- A clear description of the issue
+- Impact assessment (what can be exploited)
+- Reproduction steps or proof of concept
+- Suggested remediation, if available
 
-I (the author, [@tiangolo](https://twitter.com/tiangolo)) will review it thoroughly and get back to you.
+If private reporting is unavailable in your environment, contact repository maintainers through a private channel and reference this policy.
 
-## Public Discussions
+## Disclosure process
 
-Please restrain from publicly discussing a potential security vulnerability. 🙊
+- We acknowledge receipt as quickly as possible.
+- We triage severity and impacted components.
+- We work on a fix and coordinate disclosure timing.
+- We publish remediation guidance when a fix is available.
 
-It's better to discuss privately and try to find a solution first, to limit the potential impact as much as possible.
+## Scope reminders
 
----
+When reporting, please include whether the issue affects:
 
-Thanks for your help!
+- Backend API/authentication/JWT handling
+- Frontend token/session behavior
+- Docker/deployment configuration
+- OCR/NLP processing pipelines
 
-The community and I thank you for that. 🙇
+Thanks for helping keep the project and community safe.
