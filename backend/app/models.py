@@ -57,7 +57,9 @@ class User(UserBase, table=True):
     )
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
     applications: list["CitizenshipApplication"] = Relationship(
-        back_populates="owner", cascade_delete=True
+        back_populates="owner",
+        cascade_delete=True,
+        sa_relationship_kwargs={"foreign_keys": "[CitizenshipApplication.owner_id]"},
     )
 
 
@@ -119,6 +121,15 @@ class ApplicationStatus(str, Enum):
     QUEUED = "queued"
     PROCESSING = "processing"
     REVIEW_READY = "review_ready"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    MORE_INFO_REQUIRED = "more_info_required"
+
+
+class ReviewDecisionAction(str, Enum):
+    APPROVE = "approve"
+    REJECT = "reject"
+    REQUEST_MORE_INFO = "request_more_info"
 
 
 class DocumentStatus(str, Enum):
@@ -153,6 +164,18 @@ class CitizenshipApplication(CitizenshipApplicationBase, table=True):
     status: str = Field(default=ApplicationStatus.DRAFT.value, max_length=32)
     recommendation_summary: str | None = Field(default=None, max_length=2000)
     confidence_score: float | None = Field(default=None)
+    final_decision: str | None = Field(default=None, max_length=32)
+    final_decision_reason: str | None = Field(default=None, max_length=1000)
+    final_decision_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    final_decision_by_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="user.id",
+        nullable=True,
+        ondelete="SET NULL",
+    )
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
@@ -165,11 +188,17 @@ class CitizenshipApplication(CitizenshipApplicationBase, table=True):
         foreign_key="user.id", nullable=False, ondelete="CASCADE"
     )
 
-    owner: User | None = Relationship(back_populates="applications")
+    owner: User | None = Relationship(
+        back_populates="applications",
+        sa_relationship_kwargs={"foreign_keys": "[CitizenshipApplication.owner_id]"},
+    )
     documents: list["ApplicationDocument"] = Relationship(
         back_populates="application", cascade_delete=True
     )
     rule_results: list["EligibilityRuleResult"] = Relationship(
+        back_populates="application", cascade_delete=True
+    )
+    audit_events: list["ApplicationAuditEvent"] = Relationship(
         back_populates="application", cascade_delete=True
     )
 
@@ -179,6 +208,10 @@ class CitizenshipApplicationPublic(CitizenshipApplicationBase):
     status: ApplicationStatus
     recommendation_summary: str | None = None
     confidence_score: float | None = None
+    final_decision: str | None = None
+    final_decision_reason: str | None = None
+    final_decision_at: datetime | None = None
+    final_decision_by_id: uuid.UUID | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     owner_id: uuid.UUID
@@ -247,6 +280,11 @@ class ApplicationProcessRequest(SQLModel):
     force_reprocess: bool = False
 
 
+class ReviewDecisionRequest(SQLModel):
+    action: ReviewDecisionAction
+    reason: str = Field(min_length=8, max_length=1000)
+
+
 class EligibilityRuleResultBase(SQLModel):
     rule_code: str = Field(min_length=1, max_length=64)
     rule_name: str = Field(min_length=1, max_length=255)
@@ -285,6 +323,46 @@ class ApplicationDecisionBreakdownPublic(SQLModel):
     confidence_score: float = Field(ge=0, le=1)
     risk_level: str = Field(min_length=1, max_length=32)
     rules: list[EligibilityRuleResultPublic]
+
+
+class ApplicationAuditEventBase(SQLModel):
+    action: str = Field(min_length=1, max_length=64)
+    reason: str | None = Field(default=None, max_length=1000)
+
+
+class ApplicationAuditEvent(ApplicationAuditEventBase, table=True):
+    __tablename__ = "application_audit_event"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    event_metadata: dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
+    actor_user_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="user.id",
+        nullable=True,
+        ondelete="SET NULL",
+    )
+    application_id: uuid.UUID = Field(
+        foreign_key="citizenship_application.id", nullable=False, ondelete="CASCADE"
+    )
+
+    application: CitizenshipApplication | None = Relationship(back_populates="audit_events")
+
+
+class ApplicationAuditEventPublic(ApplicationAuditEventBase):
+    id: uuid.UUID
+    event_metadata: dict[str, Any]
+    created_at: datetime | None = None
+    actor_user_id: uuid.UUID | None = None
+    application_id: uuid.UUID
+
+
+class ApplicationAuditTrailPublic(SQLModel):
+    application_id: uuid.UUID
+    events: list[ApplicationAuditEventPublic]
 
 
 # Generic message

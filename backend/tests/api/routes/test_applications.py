@@ -99,3 +99,81 @@ def test_upload_and_process_application(
     assert "risk_level" in breakdown_content
     assert isinstance(breakdown_content["rules"], list)
     assert len(breakdown_content["rules"]) > 0
+
+
+def test_review_decision_by_superuser(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    superuser_token_headers: dict[str, str],
+) -> None:
+    create_response = client.post(
+        f"{settings.API_V1_STR}/applications/",
+        headers=normal_user_token_headers,
+        json={
+            "applicant_full_name": "Decision Candidate",
+            "applicant_nationality": "Indonesian",
+            "notes": "Ready for caseworker decision",
+        },
+    )
+    assert create_response.status_code == 200
+    application_id = create_response.json()["id"]
+
+    decision_response = client.post(
+        f"{settings.API_V1_STR}/applications/{application_id}/review-decision",
+        headers=superuser_token_headers,
+        json={
+            "action": "request_more_info",
+            "reason": "Missing long-term residency proof details",
+        },
+    )
+    assert decision_response.status_code == 200
+    decision_content = decision_response.json()
+    assert decision_content["status"] == "more_info_required"
+    assert decision_content["final_decision"] == "more_info_required"
+    assert (
+        decision_content["final_decision_reason"]
+        == "Missing long-term residency proof details"
+    )
+
+    audit_response = client.get(
+        f"{settings.API_V1_STR}/applications/{application_id}/audit-trail",
+        headers=superuser_token_headers,
+    )
+    assert audit_response.status_code == 200
+    audit_content = audit_response.json()
+    assert audit_content["application_id"] == application_id
+    assert len(audit_content["events"]) > 0
+    assert any(
+        event["action"] == "review_decision_submitted"
+        for event in audit_content["events"]
+    )
+
+
+def test_review_decision_requires_superuser(
+    client: TestClient, normal_user_token_headers: dict[str, str]
+) -> None:
+    create_response = client.post(
+        f"{settings.API_V1_STR}/applications/",
+        headers=normal_user_token_headers,
+        json={
+            "applicant_full_name": "Unauthorized Decision Candidate",
+            "applicant_nationality": "Vietnamese",
+            "notes": "Permission check",
+        },
+    )
+    assert create_response.status_code == 200
+    application_id = create_response.json()["id"]
+
+    decision_response = client.post(
+        f"{settings.API_V1_STR}/applications/{application_id}/review-decision",
+        headers=normal_user_token_headers,
+        json={
+            "action": "approve",
+            "reason": "Applicant meets all criteria",
+        },
+    )
+    assert decision_response.status_code == 403
+    assert (
+        decision_response.json()["detail"]
+        == "The user doesn't have enough privileges"
+    )

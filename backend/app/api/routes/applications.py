@@ -8,6 +8,9 @@ from sqlmodel import Session, col, delete, func, select
 from app.api.deps import CurrentUser, SessionDep
 from app.core.db import engine
 from app.models import (
+    ApplicationAuditEvent,
+    ApplicationAuditEventPublic,
+    ApplicationAuditTrailPublic,
     ApplicationDocument,
     ApplicationDocumentPublic,
     ApplicationDocumentsPublic,
@@ -19,6 +22,8 @@ from app.models import (
     CitizenshipApplicationPublic,
     CitizenshipApplicationsPublic,
     DocumentStatus,
+    ReviewDecisionAction,
+    ReviewDecisionRequest,
     EligibilityRuleResult,
     EligibilityRuleResultPublic,
     get_datetime_utc,
@@ -46,6 +51,25 @@ def get_owned_application(
     return application
 
 
+def add_audit_event(
+    *,
+    session: Session,
+    application_id: uuid.UUID,
+    action: str,
+    reason: str | None,
+    actor_user_id: uuid.UUID | None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    audit_event = ApplicationAuditEvent(
+        application_id=application_id,
+        action=action,
+        reason=reason,
+        actor_user_id=actor_user_id,
+        event_metadata=metadata or {},
+    )
+    session.add(audit_event)
+
+
 @router.post("/", response_model=CitizenshipApplicationPublic)
 def create_application(
     *,
@@ -59,6 +83,19 @@ def create_application(
     session.add(application)
     session.commit()
     session.refresh(application)
+
+    add_audit_event(
+        session=session,
+        application_id=application.id,
+        action="application_created",
+        reason="Application created by applicant",
+        actor_user_id=current_user.id,
+        metadata={
+            "applicant_full_name": application.applicant_full_name,
+            "applicant_nationality": application.applicant_nationality,
+        },
+    )
+    session.commit()
     return application
 
 
@@ -146,6 +183,18 @@ async def upload_application_document(
 
     session.add(document)
     session.add(application)
+    add_audit_event(
+        session=session,
+        application_id=application.id,
+        action="document_uploaded",
+        reason="New document uploaded",
+        actor_user_id=current_user.id,
+        metadata={
+            "document_type": document.document_type,
+            "original_filename": document.original_filename,
+            "mime_type": document.mime_type,
+        },
+    )
     session.commit()
     session.refresh(document)
     return document
@@ -177,6 +226,14 @@ def process_application_documents(application_id: uuid.UUID) -> None:
         application.status = ApplicationStatus.PROCESSING.value
         application.updated_at = get_datetime_utc()
         session.add(application)
+        add_audit_event(
+            session=session,
+            application_id=application.id,
+            action="processing_started",
+            reason="Automated pre-screening started",
+            actor_user_id=None,
+            metadata={"status": application.status},
+        )
         session.commit()
 
         documents = session.exec(
@@ -245,6 +302,19 @@ def process_application_documents(application_id: uuid.UUID) -> None:
         application.confidence_score = round(confidence_score, 2)
         application.updated_at = get_datetime_utc()
         session.add(application)
+        add_audit_event(
+            session=session,
+            application_id=application.id,
+            action="processing_completed",
+            reason="Automated pre-screening completed",
+            actor_user_id=None,
+            metadata={
+                "confidence_score": application.confidence_score,
+                "risk_level": risk_level,
+                "processed_documents": processed_documents,
+                "failed_documents": failed_documents,
+            },
+        )
         session.commit()
 
 
@@ -432,6 +502,14 @@ def queue_application_processing(
     application.status = ApplicationStatus.QUEUED.value
     application.updated_at = get_datetime_utc()
     session.add(application)
+    add_audit_event(
+        session=session,
+        application_id=application.id,
+        action="processing_queued",
+        reason="Automated pre-screening queued",
+        actor_user_id=current_user.id,
+        metadata={"force_reprocess": process_request.force_reprocess},
+    )
     session.commit()
     session.refresh(application)
 
@@ -467,4 +545,69 @@ def read_application_decision_breakdown(
         confidence_score=round(confidence_score, 2),
         risk_level=get_risk_level(confidence_score=confidence_score),
         rules=[EligibilityRuleResultPublic.model_validate(rule) for rule in rules],
+    )
+
+
+@router.post("/{application_id}/review-decision", response_model=CitizenshipApplicationPublic)
+def submit_review_decision(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    application_id: uuid.UUID,
+    decision_in: ReviewDecisionRequest,
+) -> Any:
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
+
+    application = get_owned_application(
+        session=session, current_user=current_user, application_id=application_id
+    )
+
+    previous_status = application.status
+    decision_status_map = {
+        ReviewDecisionAction.APPROVE: ApplicationStatus.APPROVED.value,
+        ReviewDecisionAction.REJECT: ApplicationStatus.REJECTED.value,
+        ReviewDecisionAction.REQUEST_MORE_INFO: ApplicationStatus.MORE_INFO_REQUIRED.value,
+    }
+    final_status = decision_status_map[decision_in.action]
+
+    application.status = final_status
+    application.final_decision = final_status
+    application.final_decision_reason = decision_in.reason
+    application.final_decision_by_id = current_user.id
+    application.final_decision_at = get_datetime_utc()
+    application.updated_at = get_datetime_utc()
+    session.add(application)
+    add_audit_event(
+        session=session,
+        application_id=application.id,
+        action="review_decision_submitted",
+        reason=decision_in.reason,
+        actor_user_id=current_user.id,
+        metadata={
+            "decision_action": decision_in.action.value,
+            "final_status": final_status,
+            "previous_status": previous_status,
+        },
+    )
+    session.commit()
+    session.refresh(application)
+    return application
+
+
+@router.get("/{application_id}/audit-trail", response_model=ApplicationAuditTrailPublic)
+def read_application_audit_trail(
+    session: SessionDep, current_user: CurrentUser, application_id: uuid.UUID
+) -> Any:
+    application = get_owned_application(
+        session=session, current_user=current_user, application_id=application_id
+    )
+    events = session.exec(
+        select(ApplicationAuditEvent)
+        .where(ApplicationAuditEvent.application_id == application_id)
+        .order_by(col(ApplicationAuditEvent.created_at).desc())
+    ).all()
+    return ApplicationAuditTrailPublic(
+        application_id=application.id,
+        events=[ApplicationAuditEventPublic.model_validate(event) for event in events],
     )

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 
 type ApplicationStatus =
@@ -74,6 +75,22 @@ interface DecisionBreakdown {
   risk_level: string
   rules: EligibilityRuleResult[]
 }
+
+interface ApplicationAuditEvent {
+  id: string
+  action: string
+  reason?: string | null
+  event_metadata: Record<string, unknown>
+  actor_user_id?: string | null
+  created_at?: string | null
+}
+
+interface ApplicationAuditTrail {
+  application_id: string
+  events: ApplicationAuditEvent[]
+}
+
+type ReviewAction = "approve" | "reject" | "request_more_info"
 
 const API_BASE = import.meta.env.VITE_API_URL
 
@@ -162,6 +179,7 @@ export const Route = createFileRoute("/_layout/applications")({
 
 function ApplicationsPage() {
   const queryClient = useQueryClient()
+  const { user: currentUser } = useAuth()
   const { showErrorToast, showSuccessToast } = useCustomToast()
   const [applicantFullName, setApplicantFullName] = useState("")
   const [applicantNationality, setApplicantNationality] = useState("")
@@ -169,6 +187,7 @@ function ApplicationsPage() {
   const [selectedApplicationId, setSelectedApplicationId] = useState("")
   const [documentType, setDocumentType] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [reviewReason, setReviewReason] = useState("")
 
   const applicationsQuery = useQuery({
     queryKey: ["citizenship-applications"],
@@ -190,6 +209,15 @@ function ApplicationsPage() {
     queryFn: () =>
       fetchJson<DecisionBreakdown>(
         `/api/v1/applications/${selectedApplicationId}/decision-breakdown`,
+      ),
+    enabled: Boolean(selectedApplicationId),
+  })
+
+  const auditTrailQuery = useQuery({
+    queryKey: ["application-audit-trail", selectedApplicationId],
+    queryFn: () =>
+      fetchJson<ApplicationAuditTrail>(
+        `/api/v1/applications/${selectedApplicationId}/audit-trail`,
       ),
     enabled: Boolean(selectedApplicationId),
   })
@@ -234,6 +262,38 @@ function ApplicationsPage() {
       })
       queryClient.invalidateQueries({
         queryKey: ["application-breakdown", selectedApplicationId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["application-audit-trail", selectedApplicationId],
+      })
+    },
+    onError: (error: Error) => showErrorToast(error.message),
+  })
+
+  const reviewDecisionMutation = useMutation({
+    mutationFn: (payload: { applicationId: string; action: ReviewAction; reason: string }) =>
+      fetchJson<CitizenshipApplication>(
+        `/api/v1/applications/${payload.applicationId}/review-decision`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: payload.action,
+            reason: payload.reason,
+          }),
+        },
+      ),
+    onSuccess: () => {
+      showSuccessToast("Caseworker decision saved")
+      setReviewReason("")
+      queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
+      queryClient.invalidateQueries({
+        queryKey: ["application-breakdown", selectedApplicationId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["application-audit-trail", selectedApplicationId],
       })
     },
     onError: (error: Error) => showErrorToast(error.message),
@@ -282,6 +342,23 @@ function ApplicationsPage() {
     })
   }
 
+  const submitReviewDecision = (action: ReviewAction) => {
+    if (!selectedApplicationId) {
+      showErrorToast("Select an application first")
+      return
+    }
+    if (reviewReason.trim().length < 8) {
+      showErrorToast("Please provide a clear reason (at least 8 characters)")
+      return
+    }
+
+    reviewDecisionMutation.mutate({
+      applicationId: selectedApplicationId,
+      action,
+      reason: reviewReason.trim(),
+    })
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -306,6 +383,8 @@ function ApplicationsPage() {
             <Label htmlFor="applicant_full_name">Applicant full name</Label>
             <Input
               id="applicant_full_name"
+              name="applicant_full_name"
+              autoComplete="name"
               value={applicantFullName}
               onChange={(event) => setApplicantFullName(event.target.value)}
               placeholder="e.g. Ola Nordmann"
@@ -315,6 +394,8 @@ function ApplicationsPage() {
             <Label htmlFor="applicant_nationality">Nationality</Label>
             <Input
               id="applicant_nationality"
+              name="applicant_nationality"
+              autoComplete="country-name"
               value={applicantNationality}
               onChange={(event) => setApplicantNationality(event.target.value)}
               placeholder="e.g. Filipino"
@@ -324,6 +405,8 @@ function ApplicationsPage() {
             <Label htmlFor="application_notes">Notes</Label>
             <Input
               id="application_notes"
+              name="application_notes"
+              autoComplete="off"
               value={applicationNotes}
               onChange={(event) => setApplicationNotes(event.target.value)}
               placeholder="Optional context"
@@ -376,6 +459,8 @@ function ApplicationsPage() {
             <Label htmlFor="document_type">Document type</Label>
             <Input
               id="document_type"
+              name="document_type"
+              autoComplete="off"
               value={documentType}
               onChange={(event) => setDocumentType(event.target.value)}
               placeholder="e.g. passport"
@@ -522,7 +607,7 @@ function ApplicationsPage() {
           <CardContent className="space-y-4">
             {breakdownQuery.isLoading && (
               <p className="text-sm text-muted-foreground">
-                Loading decision breakdown...
+                Loading decision breakdown…
               </p>
             )}
 
@@ -578,6 +663,89 @@ function ApplicationsPage() {
                 </div>
               </>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedApplicationId && currentUser?.is_superuser && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Caseworker Decision</CardTitle>
+            <CardDescription>
+              Final action requires a mandatory reason and is written to the immutable audit trail.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="review_reason">Reason (required)</Label>
+              <textarea
+                id="review_reason"
+                name="review_reason"
+                className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 min-h-24 w-full rounded-md border px-3 py-2 text-sm"
+                value={reviewReason}
+                onChange={(event) => setReviewReason(event.target.value)}
+                placeholder="Document your decision rationale for UDI/Politi auditability…"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => submitReviewDecision("approve")}
+                disabled={reviewDecisionMutation.isPending}
+              >
+                Approve
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => submitReviewDecision("reject")}
+                disabled={reviewDecisionMutation.isPending}
+              >
+                Reject
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => submitReviewDecision("request_more_info")}
+                disabled={reviewDecisionMutation.isPending}
+              >
+                Request More Info
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedApplicationId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Audit Trail</CardTitle>
+            <CardDescription>
+              Immutable timeline of applicant, system, and caseworker actions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {auditTrailQuery.isLoading && (
+              <p className="text-sm text-muted-foreground">Loading audit trail…</p>
+            )}
+            {!auditTrailQuery.isLoading &&
+              (auditTrailQuery.data?.events.length || 0) === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No audit events recorded yet.
+                </p>
+              )}
+            {auditTrailQuery.data?.events.map((event) => (
+              <div key={event.id} className="border rounded-md p-3 space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium">{event.action.replace(/_/g, " ")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {event.created_at
+                      ? new Date(event.created_at).toLocaleString()
+                      : "timestamp unavailable"}
+                  </p>
+                </div>
+                {event.reason && (
+                  <p className="text-sm text-muted-foreground">{event.reason}</p>
+                )}
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
