@@ -102,6 +102,96 @@ Then open:
 
 ## Local Development
 
+### Prerequisites
+
+- [Python 3.10+](https://www.python.org/) with [uv](https://docs.astral.sh/uv/) package manager
+- [Bun](https://bun.sh/) (frontend package manager and runtime)
+- [Docker](https://www.docker.com/) (for PostgreSQL)
+
+### 1. Start the database
+
+```bash
+docker compose up -d db --wait
+```
+
+### 2. Start the backend
+
+```bash
+cd backend
+uv sync                             # install dependencies (first time)
+uv run alembic upgrade head         # run database migrations
+uv run python -m app.initial_data   # seed superuser (first time)
+uv run fastapi dev app/main.py      # dev server → http://localhost:8000
+```
+
+API docs available at http://localhost:8000/docs (Swagger UI) and http://localhost:8000/redoc.
+
+### 3. Start the frontend
+
+```bash
+cd frontend
+bun install                         # install dependencies (first time)
+bun run dev                         # dev server → http://localhost:5173
+```
+
+### 4. Run tests
+
+```bash
+# Backend unit tests (no DB required)
+cd backend && uv run pytest tests/unit -v
+
+# Backend full test suite (requires running DB)
+cd backend && uv run pytest
+
+# Frontend unit tests
+cd frontend && bun run test:unit
+
+# Frontend E2E tests (requires running stack)
+cd frontend && bun run test
+```
+
+### 5. Build for production
+
+```bash
+# Frontend production build
+cd frontend && bun run build        # outputs to frontend/dist/
+
+# Backend Docker image (must run from project root)
+docker build -t citizenship-backend -f backend/Dockerfile .
+```
+
+### 6. Lint and format
+
+```bash
+# Backend
+cd backend && uv run ruff check .   # lint
+cd backend && uv run ruff format .  # format
+
+# Frontend
+cd frontend && bun run lint         # Biome lint + format
+```
+
+### Development URLs
+
+| Service       | URL                       |
+|---------------|---------------------------|
+| Frontend      | http://localhost:5173      |
+| Backend API   | http://localhost:8000      |
+| Swagger UI    | http://localhost:8000/docs |
+| ReDoc         | http://localhost:8000/redoc|
+| Adminer (DB)  | http://localhost:8080      |
+| Mailcatcher   | http://localhost:1080      |
+
+### Default credentials
+
+| User             | Email               | Password     |
+|------------------|---------------------|--------------|
+| Superuser/Admin  | admin@example.com   | changethis   |
+
+> **Warning:** Rotate all `changethis` defaults in `.env` before any shared deployment.
+
+### More details
+
 - Backend setup and workflow: [backend/README.md](./backend/README.md)
 - Frontend setup and workflow: [frontend/README.md](./frontend/README.md)
 - Environment and stack details: [development.md](./development.md)
