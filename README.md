@@ -2,17 +2,26 @@
 
 ## What this project is about
 
-This project is a **monolithic MVP** that demonstrates how Norway's citizenship application process can be accelerated using automation.
+This project is a **monolithic MVP** that accelerates the manual review queue in Norway's citizenship application pipeline.
 
-The goal is to reduce manual bottlenecks (currently up to ~2 years waiting time in many cases) by combining:
+### The problem
 
-- document upload and structured case intake,
-- OCR/NLP-assisted extraction,
-- explainable rule-based eligibility scoring,
-- caseworker decision support,
-- immutable audit trail for accountability.
+UDI and Politi already have automated systems that handle straightforward citizenship applications — cases with complete documentation and no flags pass through without manual intervention. The bottleneck is the **manual triage queue**: applications that are flagged, incomplete, or require human judgment. This queue grows faster than reviewers can process it (limited staffing, rising application volumes), resulting in wait times that can exceed **2 years**.
 
-The intended audience includes **UDI/Politi stakeholders** who need a practical, demo-ready system that is fast, transparent, and operationally realistic.
+### What this system does
+
+This MVP sits **on top of** UDI/Politi's existing automated pipeline. It targets specifically the cases that land in the manual review pile:
+
+- **Structured intake and document upload** — standardizes how flagged cases enter the review queue.
+- **OCR/NLP-assisted extraction** — pre-parses uploaded documents so reviewers don't start from scratch.
+- **Explainable rule-based pre-screening** — scores each case with transparent, weighted rules. Reviewers see exactly why a case scored the way it did.
+- **Priority and SLA management** — ranks the backlog by urgency and risk so the most critical cases are reviewed first.
+- **Decision support, not decision replacement** — the system recommends; a human reviewer always makes the final call.
+- **Immutable audit trail** — every action (system and human) is logged for supervision, accountability, and legal compliance.
+
+### Who it's for
+
+The intended audience is **UDI/Politi operations teams** — specifically the reviewers, team leads, and managers who handle the manual backlog. The goal is not to replace their existing automation, but to give them tools to clear the growing pile of flagged cases faster and more consistently.
 
 ## MVP scope (implemented)
 
@@ -67,8 +76,26 @@ Recommended daily triage sequence for review teams:
 5. Submit review decision with a clear mandatory reason.
 6. Audit trail automatically records action history for supervision and handoff.
 
+## Testing with sample documents
+
+The current MVP uses **placeholder OCR** — actual file content is not read yet. What matters is the `document_type` label you assign when uploading. Any valid PDF, JPEG, PNG, or WEBP file will work (even a blank page).
+
+Upload files with these `document_type` values to trigger different eligibility rules:
+
+| `document_type` value | Rule it satisfies |
+|---|---|
+| `passport` or `id_card` | Identity document present |
+| `residence_permit`, `residence_proof`, or `tax_statement` | Residency evidence present |
+| `language_certificate`, `norwegian_test`, or `education_certificate` | Language/integration evidence |
+| `police_clearance` | Security screening evidence |
+
+For the **highest confidence score**, upload one document per category (e.g. a passport PDF, a residence_permit PDF, a language_certificate image, and a police_clearance PDF). Add case notes mentioning "long-term residence" or "years" to trigger the bonus residency-duration rule.
+
+For a **low confidence / high risk** case, upload only a single passport — the missing categories will pull the score down and flag the case for priority manual review.
+
 ## Why this approach
 
+- **Targets the real bottleneck:** works on the manual review pile, not the already-automated happy path
 - **Fast to build and demo:** monolith architecture for MVP speed
 - **Safer than black-box AI:** explainable scoring and explicit rules
 - **Operationally credible:** supports human oversight and auditability

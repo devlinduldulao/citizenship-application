@@ -1,6 +1,6 @@
 # Norwegian Citizenship Automation MVP - Backend
 
-This backend provides the API and decisioning engine for a monolithic MVP focused on accelerating citizenship application processing.
+This backend provides the API and decisioning engine for the citizenship manual-review triage system. It sits on top of UDI/Politi's existing automated pipeline, targeting specifically the flagged and complex cases that land in the manual review queue.
 
 ## Backend responsibilities
 

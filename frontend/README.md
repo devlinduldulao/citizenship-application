@@ -1,6 +1,8 @@
 # Norwegian Citizenship Automation MVP - Frontend
 
-The frontend is the review dashboard for the citizenship automation MVP, built with [Vite](https://vitejs.dev/), [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/), [TanStack Query](https://tanstack.com/query), [TanStack Router](https://tanstack.com/router) and [Tailwind CSS](https://tailwindcss.com/).
+The frontend is the reviewer operations dashboard for the citizenship manual-review triage system. It gives UDI/Politi review teams a structured interface to process the backlog of flagged applications that can't be auto-decided by existing systems.
+
+Built with [Vite](https://vitejs.dev/), [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/), [TanStack Query](https://tanstack.com/query), [TanStack Router](https://tanstack.com/router) and [Tailwind CSS](https://tailwindcss.com/).
 
 ## Frontend responsibilities
 
