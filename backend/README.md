@@ -177,10 +177,6 @@ For example, to stop on first error:
 docker compose exec backend bash scripts/tests-start.sh -x
 ```
 
-### Test Coverage
-
-When the tests are run, a file `htmlcov/index.html` is generated, you can open it in your browser to see the coverage of the tests.
-
 ## Migrations
 
 As during local development your app directory is mounted as a volume inside the container, you can also run the migrations with `alembic` commands inside the container and the migration code will be in your app directory (instead of being only inside the container). So you can add it to your git repository.
@@ -240,7 +236,7 @@ Key backend paths:
 - `app/api/deps.py` — dependency injection (DB sessions, auth)
 - `app/core/config.py` — settings and environment
 - `app/alembic/versions/` — migration history
-- `tests/api/routes/test_applications.py` — route-level test coverage
+- `tests/api/routes/test_applications.py` — route-level tests
 - `tests/services/test_ocr_nlp.py` — OCR and NLP unit tests (17 tests)
 - `scripts/smoke_ocr_nlp.py` — live end-to-end OCR/NLP smoke test
 

@@ -4,6 +4,10 @@ This document describes how the project is maintained and how decisions are made
 
 ## Maintainers
 
+Current primary maintainer:
+
+- **Devlin Duldulao** — Senior Software Engineer, Crayon Consulting AS (Oslo, Norway)
+
 Maintainers are responsible for:
 
 - triaging issues and pull requests

@@ -59,7 +59,6 @@ cd backend
 uv sync                              # Install dependencies
 uv run fastapi dev app/main.py       # Dev server on :8000
 uv run pytest                        # Run tests
-uv run pytest --cov=app              # Tests with coverage
 uv run ruff check .                  # Lint
 uv run ruff format .                 # Format
 uv run mypy app/                     # Type check
@@ -150,7 +149,6 @@ Route structure: `__root.tsx` → `_layout.tsx` → `{admin,applications,items,s
 
 - **Backend:** `cd backend && uv run pytest` — all tests must pass before committing
 - **Frontend unit:** `cd frontend && bun run test` — Vitest unit tests
-- **Coverage:** `uv run pytest --cov=app` for backend coverage report
 - Add or update tests for every code change, even if not explicitly asked
 
 ## Pre-commit & Quality Gates

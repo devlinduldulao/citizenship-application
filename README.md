@@ -23,6 +23,10 @@ This MVP sits **on top of** UDI/Politi's existing automated pipeline. It targets
 
 The intended audience is **UDI/Politi operations teams** — specifically the reviewers, team leads, and managers who handle the manual backlog. The goal is not to replace their existing automation, but to give them tools to clear the growing pile of flagged cases faster and more consistently.
 
+## Maintainer
+
+- **Devlin Duldulao** — Senior Software Engineer, Crayon Consulting AS (Oslo, Norway)
+
 ## Documentation Map
 
 - [Root README](./README.md): architecture overview, setup, and runtime workflow
@@ -39,6 +43,7 @@ The intended audience is **UDI/Politi operations teams** — specifically the re
 - [Security Policy](./SECURITY.md): vulnerability reporting and disclosure flow
 - [Governance](./GOVERNANCE.md): maintainer roles and decision process
 - [Changelog](./CHANGELOG.md): release tracking entry point
+- [Authors](./AUTHORS.md): maintainers and contributors
 
 ## MVP scope (implemented)
 

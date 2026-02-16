@@ -18,7 +18,6 @@
 | Auth (passwords) | pwdlib[argon2,bcrypt]       | >=0.3.0                   |
 | HTTP Client      | httpx                       | >=0.25.1, <1.0.0          |
 | Testing          | pytest                      | >=7.4.3, <8.0.0           |
-| Coverage         | coverage                    | >=7.4.3, <8.0.0           |
 | Linting          | Ruff                        | >=0.2.2, <1.0.0           |
 | Type Checking    | mypy (strict)               | >=1.8.0, <2.0.0           |
 | Package Manager  | uv                          | Latest                    |
@@ -32,7 +31,6 @@ uv sync                              # Install dependencies from pyproject.toml
 uv run fastapi dev app/main.py       # Dev server with hot reload on :8000
 uv run fastapi run app/main.py       # Production server
 uv run pytest                         # Run all tests
-uv run pytest --cov=app               # Tests with coverage report
 uv run mypy app/                      # Type check (strict mode)
 uv run ruff check .                   # Lint
 uv run ruff format .                  # Format
@@ -49,7 +47,7 @@ uv run prek install -f                # Install pre-commit hooks
 
 ```
 backend/
-├── pyproject.toml                     # Dependencies, Ruff config, mypy config, coverage config
+├── pyproject.toml                     # Dependencies, Ruff config, mypy config
 ├── alembic.ini                        # Alembic configuration
 ├── app/
 │   ├── __init__.py
@@ -98,7 +96,6 @@ backend/
 │   ├── tests-start.sh                 # Test startup script
 │   ├── lint.sh                        # Lint script
 │   └── format.sh                      # Format script
-└── htmlcov/                           # Coverage HTML reports
 ```
 
 ## Critical Conventions
