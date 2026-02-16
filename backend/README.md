@@ -6,9 +6,18 @@ This backend provides the API and decisioning engine for the citizenship manual-
 
 - Applicant case intake and application lifecycle management
 - Requirement document upload and processing pipeline orchestration
-- Explainable eligibility scoring with weighted rule results
+- Real OCR text extraction (PyMuPDF) and NLP entity recognition (regex-based)
+- Explainable eligibility scoring with NLP-enhanced weighted rules
 - Caseworker review decisions (`approve`, `reject`, `request_more_info`)
 - Immutable audit trail for system and human actions
+
+## AI / ML Pipeline
+
+The backend contains a three-stage document intelligence pipeline:
+
+1. **OCR extraction** (`app/services/ocr.py`) — PyMuPDF extracts text from digital PDFs; Pillow + pytesseract handles scanned documents and images
+2. **NLP entity extraction** (`app/services/nlp.py`) — regex patterns tuned for Norwegian citizenship documents extract dates, passport numbers, nationalities, names, language/residency indicators, and citizenship keywords
+3. **Rule engine** (`app/api/routes/applications.py`) — 7 weighted rules combine document-type signals with NLP-extracted evidence for explainable scoring
 
 ## Implemented API domains
 
@@ -178,11 +187,15 @@ Recent MVP migrations include citizenship domain tables for:
 Key backend paths:
 
 - `app/models.py` — SQLModel domain models (applications, documents, rules, audit events)
-- `app/api/routes/applications.py` — citizenship workflow endpoints
+- `app/services/ocr.py` — OCR text extraction (PyMuPDF + Tesseract fallback)
+- `app/services/nlp.py` — Regex NLP entity extraction (dates, passport numbers, nationalities, etc.)
+- `app/api/routes/applications.py` — citizenship workflow endpoints with NLP-enhanced rule engine
 - `app/api/deps.py` — dependency injection (DB sessions, auth)
 - `app/core/config.py` — settings and environment
 - `app/alembic/versions/` — migration history
 - `tests/api/routes/test_applications.py` — route-level test coverage
+- `tests/services/test_ocr_nlp.py` — OCR and NLP unit tests (17 tests)
+- `scripts/smoke_ocr_nlp.py` — live end-to-end OCR/NLP smoke test
 
 ## Email Templates
 

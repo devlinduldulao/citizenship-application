@@ -29,7 +29,7 @@ The intended audience is **UDI/Politi operations teams** — specifically the re
 
 - Citizenship application creation and management
 - Requirement document upload (PDF/image)
-- Background processing pipeline skeleton for OCR extraction
+- Background processing pipeline with real OCR and NLP extraction
 
 ### Phase 2 — Explainable eligibility engine
 
@@ -76,9 +76,55 @@ Recommended daily triage sequence for review teams:
 5. Submit review decision with a clear mandatory reason.
 6. Audit trail automatically records action history for supervision and handoff.
 
+## AI / ML Architecture
+
+The system uses a three-stage intelligent pipeline for document analysis:
+
+### Stage 1 — Document Intelligence (OCR)
+
+| Technology | Purpose | When used |
+|---|---|---|
+| **PyMuPDF (fitz)** | Text-layer extraction from digital PDFs | Primary — handles most uploads |
+| **Pillow + pytesseract** | Image preprocessing and optical character recognition | Fallback — for scanned documents and image uploads |
+
+Extraction returns structured metadata: method used, confidence score, character count, page count, and any warnings (e.g. `ocr_unavailable` if Tesseract is not installed).
+
+### Stage 2 — Entity Extraction (NLP)
+
+Regex-based named entity recognition tuned for Norwegian citizenship documents. Extracts:
+
+| Entity type | Examples |
+|---|---|
+| **Dates** | `15.03.1990`, `2023-01-15`, `15 mars 1990`, `20 oktober 2024` |
+| **Passport numbers** | `NO1234567`, fødselsnummer patterns (`ddmmyyXXXXX`) |
+| **Nationalities** | 50+ nationalities in English and Norwegian |
+| **Names** | Surname/given name fields, title-case sequences |
+| **Citizenship keywords** | `statsborgerskap`, `permanent residence`, `oppholdstillatelse` |
+| **Language indicators** | `norskprøve`, `B1`, `B2`, `bestått`, `kompetanse norge` |
+| **Residency indicators** | `bodd i Norge`, `folkeregisteret`, `years in Norway` |
+| **Addresses** | Norwegian postal code patterns, street addresses |
+
+Each document receives an NLP score (0–1) based on entity richness across categories.
+
+### Stage 3 — Explainable Rule Engine
+
+7 weighted rules combine document-type signals with NLP-extracted evidence:
+
+| Rule | Weight | NLP enhancement |
+|---|---|---|
+| Identity document present | 0.20 | Passport number in text boosts score even without matching doc type |
+| Residency evidence present | 0.18 | NLP residency keywords can partially satisfy the rule |
+| Document OCR/NLP quality | 0.17 | Includes avg NLP entity richness score |
+| Language/integration evidence | 0.15 | Language proficiency indicators found in text |
+| Security screening evidence | 0.15 | Police clearance document detection |
+| NLP entity richness | 0.10 | Total entities extracted across all documents |
+| Residency duration signal | 0.05 | Case notes + NLP residency signals combined |
+
+Every rule includes a human-readable rationale and full evidence payload so reviewers can verify the system's reasoning.
+
 ## Testing with sample documents
 
-The current MVP uses **placeholder OCR** — actual file content is not read yet. What matters is the `document_type` label you assign when uploading. Any valid PDF, JPEG, PNG, or WEBP file will work (even a blank page).
+The system performs **real OCR text extraction and NLP entity recognition** on uploaded files. Upload actual PDFs with text content to get meaningful extraction results.
 
 Upload files with these `document_type` values to trigger different eligibility rules:
 
@@ -93,13 +139,25 @@ For the **highest confidence score**, upload one document per category (e.g. a p
 
 For a **low confidence / high risk** case, upload only a single passport — the missing categories will pull the score down and flag the case for priority manual review.
 
+### Live smoke test
+
+An end-to-end smoke test creates realistic passport and language certificate PDFs (using PyMuPDF), uploads them, triggers processing, and verifies extraction results:
+
+```bash
+cd backend
+uv run python scripts/smoke_ocr_nlp.py
+```
+
+Expected output includes extracted passport numbers, nationalities, language indicators, dates, and NLP-enhanced rule scoring.
+
 ## Why this approach
 
 - **Targets the real bottleneck:** works on the manual review pile, not the already-automated happy path
 - **Fast to build and demo:** monolith architecture for MVP speed
 - **Safer than black-box AI:** explainable scoring and explicit rules
 - **Operationally credible:** supports human oversight and auditability
-- **Extensible:** can incrementally add stronger OCR/ML models and policy rules
+- **Real AI pipeline:** PyMuPDF document intelligence, regex NLP entity extraction, and NLP-enhanced scoring
+- **Extensible:** can incrementally add stronger OCR/ML models (spaCy, transformer NER) and policy rules
 
 ## Next planned phases
 
@@ -110,9 +168,10 @@ For a **low confidence / high risk** case, upload only a single passport — the
 ## Technology Stack
 
 - Backend: FastAPI, SQLModel, Pydantic, PostgreSQL
+- AI/ML: PyMuPDF (document intelligence), Pillow (image processing), pytesseract (OCR), regex NLP (entity extraction)
 - Frontend: React, TypeScript, TanStack Router/Query, Tailwind CSS, shadcn/ui
 - Infrastructure: Docker Compose, Traefik, JWT authentication
-- Quality: Pytest backend tests and Playwright end-to-end tests
+- Quality: Pytest backend tests (including OCR/NLP unit tests) and Playwright end-to-end tests
 
 ## Quick Start (Docker)
 

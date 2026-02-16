@@ -8,6 +8,8 @@ from sqlmodel import Session, col, delete, func, select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.db import engine
+from app.services.nlp import ExtractedEntities, compute_document_nlp_score, extract_entities
+from app.services.ocr import extract_text
 from app.models import (
     ApplicationAuditEvent,
     ApplicationAuditEventPublic,
@@ -368,6 +370,8 @@ def process_application_documents(application_id: uuid.UUID) -> None:
 
         processed_documents = 0
         failed_documents = 0
+        all_entities: list[ExtractedEntities] = []
+
         for document in documents:
             try:
                 document.status = DocumentStatus.PROCESSING.value
@@ -376,14 +380,31 @@ def process_application_documents(application_id: uuid.UUID) -> None:
                 if not Path(document.storage_path).exists():
                     raise FileNotFoundError("Stored file no longer exists")
 
-                document.ocr_text = (
-                    "MVP OCR placeholder text extracted from "
-                    f"{document.original_filename}"
+                # --- Real OCR extraction ---
+                extraction = extract_text(
+                    file_path=document.storage_path,
+                    mime_type=document.mime_type or "application/pdf",
+                )
+
+                # --- Real NLP entity extraction ---
+                entities = extract_entities(extraction.text)
+                all_entities.append(entities)
+                nlp_score = compute_document_nlp_score(entities)
+
+                document.ocr_text = extraction.text or (
+                    f"No text extracted from {document.original_filename} "
+                    f"(method: {extraction.extraction_method})"
                 )
                 document.extracted_fields = {
                     "document_type": document.document_type,
                     "filename": document.original_filename,
-                    "status": "parsed",
+                    "extraction_method": extraction.extraction_method,
+                    "extraction_confidence": extraction.confidence,
+                    "char_count": extraction.char_count,
+                    "page_count": extraction.page_count,
+                    "nlp_score": nlp_score,
+                    "entities": entities.to_dict(),
+                    "warnings": extraction.warnings,
                 }
                 document.processing_error = None
                 document.status = DocumentStatus.PROCESSED.value
@@ -401,7 +422,11 @@ def process_application_documents(application_id: uuid.UUID) -> None:
         )
         session.exec(statement)
 
-        rules = evaluate_eligibility_rules(application=application, documents=documents)
+        rules = evaluate_eligibility_rules(
+            application=application,
+            documents=documents,
+            all_entities=all_entities,
+        )
         for rule in rules:
             session.add(rule)
 
@@ -482,7 +507,10 @@ def get_recommendation(
 
 
 def evaluate_eligibility_rules(
-    *, application: CitizenshipApplication, documents: list[ApplicationDocument]
+    *,
+    application: CitizenshipApplication,
+    documents: list[ApplicationDocument],
+    all_entities: list[ExtractedEntities] | None = None,
 ) -> list[EligibilityRuleResult]:
     normalized_types = {document.document_type.strip().lower() for document in documents}
     processed_documents = [
@@ -510,60 +538,126 @@ def evaluate_eligibility_rules(
         or "long-term" in note_text
     )
 
+    # --- Aggregate NLP entities across all documents ---
+    merged_entities = ExtractedEntities()
+    nlp_scores: list[float] = []
+    if all_entities:
+        for ent in all_entities:
+            merged_entities.dates.extend(ent.dates)
+            merged_entities.passport_numbers.extend(ent.passport_numbers)
+            merged_entities.names.extend(ent.names)
+            merged_entities.nationalities.extend(ent.nationalities)
+            merged_entities.keywords_found.extend(ent.keywords_found)
+            merged_entities.language_indicators.extend(ent.language_indicators)
+            merged_entities.residency_indicators.extend(ent.residency_indicators)
+            merged_entities.addresses.extend(ent.addresses)
+            merged_entities.numeric_values.extend(ent.numeric_values)
+            merged_entities.raw_entity_count += ent.raw_entity_count
+            nlp_scores.append(compute_document_nlp_score(ent))
+
+    avg_nlp_score = round(sum(nlp_scores) / len(nlp_scores), 2) if nlp_scores else 0.0
+
+    # NLP-enhanced signals
+    nlp_has_passport_number = len(merged_entities.passport_numbers) > 0
+    nlp_has_dates = len(merged_entities.dates) >= 2  # e.g. birth + issue date
+    nlp_has_language_signal = len(merged_entities.language_indicators) > 0
+    nlp_has_residency_signal = len(merged_entities.residency_indicators) > 0
+    nlp_has_nationality = len(merged_entities.nationalities) > 0
+
+    # Boost identity score if NLP found passport numbers in text
+    identity_score = 1.0 if has_identity_document else 0.0
+    if nlp_has_passport_number and has_identity_document:
+        identity_score = 1.0  # confirmed by content
+    elif nlp_has_passport_number:
+        identity_score = 0.7  # found in text but no doc type match
+
+    # Boost residency score with NLP signals
+    residency_score = 1.0 if has_residency_document else 0.0
+    if nlp_has_residency_signal and not has_residency_document:
+        residency_score = 0.6  # NLP found residency keywords in content
+
+    # Boost language score with NLP signals
+    language_score = 1.0 if has_language_document else 0.35
+    if nlp_has_language_signal and not has_language_document:
+        language_score = 0.7  # NLP found language test indicators
+
     rule_payloads: list[dict[str, Any]] = [
         {
             "rule_code": "identity_document_present",
             "rule_name": "Identity document provided",
-            "passed": has_identity_document,
-            "score": 1.0 if has_identity_document else 0.0,
-            "weight": 0.25,
+            "passed": has_identity_document or nlp_has_passport_number,
+            "score": identity_score,
+            "weight": 0.20,
             "rationale": (
                 "Passport or national ID detected"
-                if has_identity_document
+                + ("; passport number extracted from text" if nlp_has_passport_number else "")
+                if has_identity_document or nlp_has_passport_number
                 else "No passport or national ID document uploaded"
             ),
-            "evidence": {"document_types": sorted(normalized_types)},
+            "evidence": {
+                "document_types": sorted(normalized_types),
+                "nlp_passport_numbers": merged_entities.passport_numbers[:3],
+                "nlp_dates_found": len(merged_entities.dates),
+            },
         },
         {
             "rule_code": "residency_evidence_present",
             "rule_name": "Residency evidence provided",
-            "passed": has_residency_document,
-            "score": 1.0 if has_residency_document else 0.0,
-            "weight": 0.2,
+            "passed": has_residency_document or nlp_has_residency_signal,
+            "score": residency_score,
+            "weight": 0.18,
             "rationale": (
                 "Residency-related document detected"
-                if has_residency_document
-                else "No residency proof document detected"
+                + (
+                    "; NLP found residency keywords in text"
+                    if nlp_has_residency_signal
+                    else ""
+                )
+                if has_residency_document or nlp_has_residency_signal
+                else "No residency proof document or text signals detected"
             ),
-            "evidence": {"document_types": sorted(normalized_types)},
+            "evidence": {
+                "document_types": sorted(normalized_types),
+                "nlp_residency_indicators": merged_entities.residency_indicators[:5],
+                "nlp_addresses": merged_entities.addresses[:3],
+            },
         },
         {
             "rule_code": "language_requirement_evidence",
             "rule_name": "Language or integration evidence",
-            "passed": has_language_document,
-            "score": 1.0 if has_language_document else 0.35,
+            "passed": has_language_document or nlp_has_language_signal,
+            "score": language_score,
             "weight": 0.15,
             "rationale": (
                 "Language/integration certificate detected"
-                if has_language_document
-                else "No explicit language certificate found"
+                + (
+                    "; language proficiency indicators found in text"
+                    if nlp_has_language_signal
+                    else ""
+                )
+                if has_language_document or nlp_has_language_signal
+                else "No explicit language certificate or text indicators found"
             ),
-            "evidence": {"document_types": sorted(normalized_types)},
+            "evidence": {
+                "document_types": sorted(normalized_types),
+                "nlp_language_indicators": merged_entities.language_indicators[:5],
+            },
         },
         {
             "rule_code": "document_parsing_quality",
-            "rule_name": "Document OCR extraction quality",
+            "rule_name": "Document OCR/NLP extraction quality",
             "passed": ocr_quality_ratio >= 0.8,
             "score": round(ocr_quality_ratio, 2),
-            "weight": 0.25,
+            "weight": 0.17,
             "rationale": (
-                "Most documents parsed successfully"
-                if ocr_quality_ratio >= 0.8
-                else "OCR quality is too low for confident recommendation"
+                f"OCR processed {len(processed_documents)}/{len(documents)} documents"
+                + (f"; avg NLP entity score {avg_nlp_score}" if avg_nlp_score > 0 else "")
             ),
             "evidence": {
                 "processed_documents": len(processed_documents),
                 "total_documents": len(documents),
+                "avg_nlp_score": avg_nlp_score,
+                "total_entities_extracted": merged_entities.raw_entity_count,
             },
         },
         {
@@ -579,18 +673,53 @@ def evaluate_eligibility_rules(
             ),
             "evidence": {"document_types": sorted(normalized_types)},
         },
+        {
+            "rule_code": "nlp_entity_richness",
+            "rule_name": "NLP entity extraction richness",
+            "passed": merged_entities.raw_entity_count >= 5,
+            "score": min(1.0, merged_entities.raw_entity_count / 10),
+            "weight": 0.10,
+            "rationale": (
+                f"NLP extracted {merged_entities.raw_entity_count} entities across "
+                f"{len(all_entities or [])} documents "
+                f"(nationalities: {len(merged_entities.nationalities)}, "
+                f"keywords: {len(merged_entities.keywords_found)}, "
+                f"dates: {len(merged_entities.dates)})"
+            ),
+            "evidence": {
+                "raw_entity_count": merged_entities.raw_entity_count,
+                "nationalities_found": merged_entities.nationalities[:5],
+                "keywords_found": merged_entities.keywords_found[:10],
+                "names_found": merged_entities.names[:3],
+            },
+        },
     ]
 
-    if mentions_long_residency:
+    if mentions_long_residency or nlp_has_residency_signal:
+        residency_duration_score = 0.8
+        if nlp_has_residency_signal and mentions_long_residency:
+            residency_duration_score = 1.0
         rule_payloads.append(
             {
                 "rule_code": "residency_duration_signal",
-                "rule_name": "Residency duration signal from case notes",
+                "rule_name": "Residency duration signal",
                 "passed": True,
-                "score": 0.8,
-                "weight": 0.1,
-                "rationale": "Case notes indicate long-term residence",
-                "evidence": {"notes": application.notes},
+                "score": residency_duration_score,
+                "weight": 0.05,
+                "rationale": (
+                    "Residency duration detected via "
+                    + (
+                        "case notes and NLP text analysis"
+                        if mentions_long_residency and nlp_has_residency_signal
+                        else "case notes" if mentions_long_residency
+                        else "NLP text analysis"
+                    )
+                ),
+                "evidence": {
+                    "notes": application.notes,
+                    "nlp_residency_indicators": merged_entities.residency_indicators[:5],
+                    "nlp_numeric_values": merged_entities.numeric_values[:5],
+                },
             }
         )
 
