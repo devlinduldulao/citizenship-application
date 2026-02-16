@@ -255,3 +255,7 @@ Email templates live in `./backend/app/email-templates/`. Edit `.mjml` sources i
 - [Roadmap](../ROADMAP.md)
 - [Immigrant User Guide](../IMMIGRANT_USER_GUIDE.md)
 - [Reviewer Admin Guide](../REVIEWER_ADMIN_GUIDE.md)
+- [Contributing Guide](../CONTRIBUTING.md)
+- [Code of Conduct](../CODE_OF_CONDUCT.md)
+- [Support](../SUPPORT.md)
+- [Security Policy](../SECURITY.md)

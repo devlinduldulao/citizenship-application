@@ -33,6 +33,12 @@ The intended audience is **UDI/Politi operations teams** — specifically the re
 - [Roadmap](./ROADMAP.md): phased delivery plan for product + AI evolution
 - [Immigrant User Guide](./IMMIGRANT_USER_GUIDE.md): step-by-step applicant journey
 - [Reviewer Admin Guide](./REVIEWER_ADMIN_GUIDE.md): step-by-step UDI/Politi/admin workflow
+- [Contributing Guide](./CONTRIBUTING.md): contributor workflow and review expectations
+- [Code of Conduct](./CODE_OF_CONDUCT.md): community standards and behavior expectations
+- [Support](./SUPPORT.md): where to ask questions and report non-security issues
+- [Security Policy](./SECURITY.md): vulnerability reporting and disclosure flow
+- [Governance](./GOVERNANCE.md): maintainer roles and decision process
+- [Changelog](./CHANGELOG.md): release tracking entry point
 
 ## MVP scope (implemented)
 
@@ -389,6 +395,10 @@ Deployment guidance: [deployment.md](./deployment.md)
 - [Contributing](./CONTRIBUTING.md)
 - [Security Policy](./SECURITY.md)
 - [Roadmap](./ROADMAP.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Support](./SUPPORT.md)
+- [Governance](./GOVERNANCE.md)
+- [Changelog](./CHANGELOG.md)
 
 ## License
 
