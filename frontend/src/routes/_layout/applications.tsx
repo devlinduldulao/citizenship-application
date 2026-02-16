@@ -24,6 +24,9 @@ type ApplicationStatus =
   | "queued"
   | "processing"
   | "review_ready"
+  | "approved"
+  | "rejected"
+  | "more_info_required"
 
 type DocumentStatus = "uploaded" | "processing" | "processed" | "failed"
 
@@ -35,6 +38,8 @@ interface CitizenshipApplication {
   status: ApplicationStatus
   recommendation_summary?: string | null
   confidence_score?: number | null
+  priority_score?: number
+  sla_due_at?: string | null
   created_at?: string | null
 }
 
@@ -88,6 +93,33 @@ interface ApplicationAuditEvent {
 interface ApplicationAuditTrail {
   application_id: string
   events: ApplicationAuditEvent[]
+}
+
+interface ReviewQueueItem {
+  id: string
+  applicant_full_name: string
+  applicant_nationality: string
+  status: ApplicationStatus
+  recommendation_summary?: string | null
+  confidence_score?: number | null
+  risk_level: string
+  priority_score: number
+  sla_due_at?: string | null
+  is_overdue: boolean
+}
+
+interface ReviewQueueResponse {
+  data: ReviewQueueItem[]
+  count: number
+}
+
+interface ReviewQueueMetrics {
+  pending_manual_count: number
+  overdue_count: number
+  high_priority_count: number
+  avg_waiting_days: number
+  daily_manual_capacity: number
+  estimated_days_to_clear_backlog: number
 }
 
 type ReviewAction = "approve" | "reject" | "request_more_info"
@@ -161,6 +193,9 @@ const queueProcessing = async (applicationId: string) => {
 }
 
 const getStatusBadgeVariant = (status: ApplicationStatus) => {
+  if (status === "approved") return "default"
+  if (status === "rejected") return "destructive"
+  if (status === "more_info_required") return "secondary"
   if (status === "review_ready") return "default"
   if (status === "processing" || status === "queued") return "secondary"
   return "outline"
@@ -188,6 +223,19 @@ function ApplicationsPage() {
   const [documentType, setDocumentType] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [reviewReason, setReviewReason] = useState("")
+
+  const reviewQueueQuery = useQuery({
+    queryKey: ["review-queue"],
+    queryFn: () =>
+      fetchJson<ReviewQueueResponse>("/api/v1/applications/queue/review?skip=0&limit=5"),
+    enabled: Boolean(currentUser?.is_superuser),
+  })
+
+  const reviewQueueMetricsQuery = useQuery({
+    queryKey: ["review-queue-metrics"],
+    queryFn: () => fetchJson<ReviewQueueMetrics>("/api/v1/applications/queue/metrics"),
+    enabled: Boolean(currentUser?.is_superuser),
+  })
 
   const applicationsQuery = useQuery({
     queryKey: ["citizenship-applications"],
@@ -231,6 +279,8 @@ function ApplicationsPage() {
       setApplicationNotes("")
       setSelectedApplicationId(application.id)
       queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
+      queryClient.invalidateQueries({ queryKey: ["review-queue"] })
+      queryClient.invalidateQueries({ queryKey: ["review-queue-metrics"] })
     },
     onError: (error: Error) => showErrorToast(error.message),
   })
@@ -242,6 +292,8 @@ function ApplicationsPage() {
       setDocumentType("")
       setSelectedFile(null)
       queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
+      queryClient.invalidateQueries({ queryKey: ["review-queue"] })
+      queryClient.invalidateQueries({ queryKey: ["review-queue-metrics"] })
       queryClient.invalidateQueries({
         queryKey: ["application-documents", selectedApplicationId],
       })
@@ -289,6 +341,8 @@ function ApplicationsPage() {
       showSuccessToast("Caseworker decision saved")
       setReviewReason("")
       queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
+      queryClient.invalidateQueries({ queryKey: ["review-queue"] })
+      queryClient.invalidateQueries({ queryKey: ["review-queue-metrics"] })
       queryClient.invalidateQueries({
         queryKey: ["application-breakdown", selectedApplicationId],
       })
@@ -361,6 +415,73 @@ function ApplicationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {currentUser?.is_superuser && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Manual Review Workload</CardTitle>
+            <CardDescription>
+              Backlog pressure and SLA risk indicators for reviewer planning.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {reviewQueueMetricsQuery.isLoading && (
+              <p className="text-sm text-muted-foreground">Loading queue metrics…</p>
+            )}
+            {!reviewQueueMetricsQuery.isLoading && reviewQueueMetricsQuery.data && (
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="border rounded-md p-3">
+                  <p className="text-xs text-muted-foreground">Pending Manual</p>
+                  <p className="text-xl font-semibold">
+                    {reviewQueueMetricsQuery.data.pending_manual_count}
+                  </p>
+                </div>
+                <div className="border rounded-md p-3">
+                  <p className="text-xs text-muted-foreground">Overdue SLA</p>
+                  <p className="text-xl font-semibold text-destructive">
+                    {reviewQueueMetricsQuery.data.overdue_count}
+                  </p>
+                </div>
+                <div className="border rounded-md p-3">
+                  <p className="text-xs text-muted-foreground">Backlog Clearance</p>
+                  <p className="text-xl font-semibold">
+                    {reviewQueueMetricsQuery.data.estimated_days_to_clear_backlog} days
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Top Priority Queue</p>
+              {reviewQueueQuery.isLoading && (
+                <p className="text-sm text-muted-foreground">Loading priority queue…</p>
+              )}
+              {!reviewQueueQuery.isLoading &&
+                (reviewQueueQuery.data?.data.length || 0) === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No manual-review applications in queue.
+                  </p>
+                )}
+              {reviewQueueQuery.data?.data.map((item) => (
+                <div key={item.id} className="border rounded-md p-3 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{item.applicant_full_name}</p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={item.is_overdue ? "destructive" : "outline"}>
+                        {item.is_overdue ? "SLA overdue" : "SLA active"}
+                      </Badge>
+                      <Badge variant="secondary">Priority {item.priority_score}</Badge>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {item.applicant_nationality} · {item.status.replace(/_/g, " ")} · Risk {item.risk_level}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
           Citizenship Applications

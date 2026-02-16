@@ -16,6 +16,33 @@ This backend provides the API and decisioning engine for a monolithic MVP focuse
 - Applications and documents (`/applications`)
 - Automated pre-screening + decision breakdown (`/applications/{id}/decision-breakdown`)
 - Caseworker actions + audit (`/applications/{id}/review-decision`, `/applications/{id}/audit-trail`)
+- Reviewer workload queue + SLA metrics (`/applications/queue/review`, `/applications/queue/metrics`)
+
+## Queue & SLA operations
+
+These endpoints are superuser-only and are used to monitor and prioritize manual review workload.
+
+- `GET /api/v1/applications/queue/review`
+	- Returns pending manual-review applications sorted by priority.
+	- Includes queue-facing fields such as `priority_score`, `sla_due_at`, and `is_overdue`.
+- `GET /api/v1/applications/queue/metrics`
+	- Returns aggregate operational counts for reviewer throughput.
+
+Metric definitions:
+
+- `pending_manual_count`: applications currently awaiting manual review.
+- `overdue_count`: pending-manual applications where current time is past `sla_due_at`.
+- `high_priority_count`: pending-manual applications above the high-priority threshold.
+
+### Reviewer Ops Playbook
+
+Suggested operational flow for API consumers and reviewer teams:
+
+1. Call `GET /api/v1/applications/queue/metrics` and inspect `overdue_count`.
+2. Call `GET /api/v1/applications/queue/review` and process overdue items first.
+3. Continue with highest `priority_score` items in pending manual queue.
+4. Use decision-breakdown and uploaded document context before deciding.
+5. Submit final review action with mandatory reason; rely on audit trail for traceability.
 
 The core data and schema definitions are in `./backend/app/models.py` and route handlers are in `./backend/app/api/routes/`.
 
@@ -56,57 +83,11 @@ The setup is also already configured so you can run the tests through the VS Cod
 
 ## Docker Compose Override
 
-During development, you can change Docker Compose settings that will only affect the local development environment in the file `compose.override.yml`.
+Development-only overrides go in `compose.override.yml`. Key behaviours:
 
-The changes to that file only affect the local development environment, not the production environment. So, you can add "temporary" changes that help the development workflow.
-
-For example, the directory with the backend code is synchronized in the Docker container, copying the code you change live to the directory inside the container. That allows you to test your changes right away, without having to build the Docker image again. It should only be done during development, for production, you should build the Docker image with a recent version of the backend code. But during development, it allows you to iterate very fast.
-
-There is also a command override that runs `fastapi run --reload` instead of the default `fastapi run`. It starts a single server process (instead of multiple, as would be for production) and reloads the process whenever the code changes. Have in mind that if you have a syntax error and save the Python file, it will break and exit, and the container will stop. After that, you can restart the container by fixing the error and running again:
-
-```console
-$ docker compose watch
-```
-
-There is also a commented out `command` override, you can uncomment it and comment the default one. It makes the backend container run a process that does "nothing", but keeps the container alive. That allows you to get inside your running container and execute commands inside, for example a Python interpreter to test installed dependencies, or start the development server that reloads when it detects changes.
-
-To get inside the container with a `bash` session you can start the stack with:
-
-```console
-$ docker compose watch
-```
-
-and then in another terminal, `exec` inside the running container:
-
-```console
-$ docker compose exec backend bash
-```
-
-You should see an output like:
-
-```console
-root@7f2607af31c3:/app#
-```
-
-that means that you are in a `bash` session inside your container, as a `root` user, under the `/app` directory, this directory has another directory called "app" inside, that's where your code lives inside the container: `/app/app`.
-
-There you can use the `fastapi run --reload` command to run the debug live reloading server.
-
-```console
-$ fastapi run --reload app/main.py
-```
-
-...it will look like:
-
-```console
-root@7f2607af31c3:/app# fastapi run --reload app/main.py
-```
-
-and then hit enter. That runs the live reloading server that auto reloads when it detects code changes.
-
-Nevertheless, if it doesn't detect a change but a syntax error, it will just stop with an error. But as the container is still alive and you are in a Bash session, you can quickly restart it after fixing the error, running the same command ("up arrow" and "Enter").
-
-...this previous detail is what makes it useful to have the container alive doing nothing and then, in a Bash session, make it run the live reload server.
+- Backend source directory is volume-mounted for live code sync.
+- `fastapi run --reload` restarts on file changes (single worker).
+- Use `docker compose exec backend bash` to open a shell inside the container.
 
 ## Backend tests
 
@@ -192,10 +173,17 @@ Recent MVP migrations include citizenship domain tables for:
 - eligibility rule results,
 - review decisions and audit events.
 
+## Code Structure
+
+Key backend paths:
+
+- `app/models.py` — SQLModel domain models (applications, documents, rules, audit events)
+- `app/api/routes/applications.py` — citizenship workflow endpoints
+- `app/api/deps.py` — dependency injection (DB sessions, auth)
+- `app/core/config.py` — settings and environment
+- `app/alembic/versions/` — migration history
+- `tests/api/routes/test_applications.py` — route-level test coverage
+
 ## Email Templates
 
-The email templates are in `./backend/app/email-templates/`. Here, there are two directories: `build` and `src`. The `src` directory contains the source files that are used to build the final email templates. The `build` directory contains the final email templates that are used by the application.
-
-Before continuing, ensure you have the [MJML extension](https://github.com/mjmlio/vscode-mjml) installed in your VS Code.
-
-Once you have the MJML extension installed, you can create a new email template in the `src` directory. After creating the new email template and with the `.mjml` file open in your editor, open the command palette with `Ctrl+Shift+P` and search for `MJML: Export to HTML`. This will convert the `.mjml` file to a `.html` file and now you can save it in the build directory.
+Email templates live in `./backend/app/email-templates/`. Edit `.mjml` sources in `src/`, then export to HTML in `build/` using the VS Code MJML extension (`Ctrl+Shift+P` → `MJML: Export to HTML`).

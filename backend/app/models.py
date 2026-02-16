@@ -164,6 +164,11 @@ class CitizenshipApplication(CitizenshipApplicationBase, table=True):
     status: str = Field(default=ApplicationStatus.DRAFT.value, max_length=32)
     recommendation_summary: str | None = Field(default=None, max_length=2000)
     confidence_score: float | None = Field(default=None)
+    priority_score: float = Field(default=0, ge=0, le=100)
+    sla_due_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore
+    )
     final_decision: str | None = Field(default=None, max_length=32)
     final_decision_reason: str | None = Field(default=None, max_length=1000)
     final_decision_at: datetime | None = Field(
@@ -208,6 +213,8 @@ class CitizenshipApplicationPublic(CitizenshipApplicationBase):
     status: ApplicationStatus
     recommendation_summary: str | None = None
     confidence_score: float | None = None
+    priority_score: float = 0
+    sla_due_at: datetime | None = None
     final_decision: str | None = None
     final_decision_reason: str | None = None
     final_decision_at: datetime | None = None
@@ -220,6 +227,35 @@ class CitizenshipApplicationPublic(CitizenshipApplicationBase):
 class CitizenshipApplicationsPublic(SQLModel):
     data: list[CitizenshipApplicationPublic]
     count: int
+
+
+class ReviewQueueItemPublic(SQLModel):
+    id: uuid.UUID
+    applicant_full_name: str
+    applicant_nationality: str
+    status: ApplicationStatus
+    recommendation_summary: str | None = None
+    confidence_score: float | None = None
+    risk_level: str = Field(min_length=1, max_length=32)
+    priority_score: float = Field(ge=0, le=100)
+    sla_due_at: datetime | None = None
+    is_overdue: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ReviewQueuePublic(SQLModel):
+    data: list[ReviewQueueItemPublic]
+    count: int
+
+
+class ReviewQueueMetricsPublic(SQLModel):
+    pending_manual_count: int
+    overdue_count: int
+    high_priority_count: int
+    avg_waiting_days: float
+    daily_manual_capacity: int
+    estimated_days_to_clear_backlog: float
 
 
 class ApplicationDocumentBase(SQLModel):

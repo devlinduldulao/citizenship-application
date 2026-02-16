@@ -1,4 +1,5 @@
 import uuid
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,9 @@ from app.models import (
     ApplicationAuditEvent,
     ApplicationAuditEventPublic,
     ApplicationAuditTrailPublic,
+    ReviewQueueItemPublic,
+    ReviewQueueMetricsPublic,
+    ReviewQueuePublic,
     ApplicationDocument,
     ApplicationDocumentPublic,
     ApplicationDocumentsPublic,
@@ -37,6 +41,11 @@ ALLOWED_CONTENT_TYPES = {
     "image/jpeg",
     "image/png",
     "image/webp",
+}
+
+MANUAL_QUEUE_STATUSES = {
+    ApplicationStatus.REVIEW_READY.value,
+    ApplicationStatus.MORE_INFO_REQUIRED.value,
 }
 
 
@@ -68,6 +77,53 @@ def add_audit_event(
         event_metadata=metadata or {},
     )
     session.add(audit_event)
+
+
+def calculate_sla_due_at(*, risk_level: str) -> Any:
+    now = get_datetime_utc()
+    if risk_level == "high":
+        return now + timedelta(days=7)
+    if risk_level == "medium":
+        return now + timedelta(days=14)
+    return now + timedelta(days=21)
+
+
+def calculate_priority_score(
+    *, confidence_score: float, risk_level: str, failed_documents: int, age_days: float
+) -> float:
+    risk_component = {"high": 45, "medium": 30, "low": 15}.get(risk_level, 20)
+    confidence_component = (1 - confidence_score) * 30
+    failure_component = 15 if failed_documents > 0 else 0
+    aging_component = min(age_days * 2, 20)
+    score = risk_component + confidence_component + failure_component + aging_component
+    return round(max(0, min(100, score)), 2)
+
+
+def is_application_overdue(application: CitizenshipApplication) -> bool:
+    if application.status not in MANUAL_QUEUE_STATUSES:
+        return False
+    if not application.sla_due_at:
+        return False
+    return application.sla_due_at < get_datetime_utc()
+
+
+def map_review_queue_item(application: CitizenshipApplication) -> ReviewQueueItemPublic:
+    confidence_score = application.confidence_score or 0.0
+    risk_level = get_risk_level(confidence_score=confidence_score)
+    return ReviewQueueItemPublic(
+        id=application.id,
+        applicant_full_name=application.applicant_full_name,
+        applicant_nationality=application.applicant_nationality,
+        status=ApplicationStatus(application.status),
+        recommendation_summary=application.recommendation_summary,
+        confidence_score=application.confidence_score,
+        risk_level=risk_level,
+        priority_score=application.priority_score,
+        sla_due_at=application.sla_due_at,
+        is_overdue=is_application_overdue(application),
+        created_at=application.created_at,
+        updated_at=application.updated_at,
+    )
 
 
 @router.post("/", response_model=CitizenshipApplicationPublic)
@@ -129,6 +185,74 @@ def read_applications(
 
     applications = session.exec(statement).all()
     return CitizenshipApplicationsPublic(data=applications, count=count)
+
+
+@router.get("/queue/review", response_model=ReviewQueuePublic)
+def read_review_queue(
+    session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100
+) -> Any:
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
+
+    statement = select(CitizenshipApplication).where(
+        col(CitizenshipApplication.status).in_(MANUAL_QUEUE_STATUSES)
+    )
+    queue_rows = session.exec(statement).all()
+
+    queue_rows_sorted = sorted(
+        queue_rows,
+        key=lambda application: (
+            not is_application_overdue(application),
+            -application.priority_score,
+            application.sla_due_at or get_datetime_utc(),
+            application.created_at or get_datetime_utc(),
+        ),
+    )
+    paged_rows = queue_rows_sorted[skip : skip + limit]
+    return ReviewQueuePublic(
+        data=[map_review_queue_item(row) for row in paged_rows],
+        count=len(queue_rows_sorted),
+    )
+
+
+@router.get("/queue/metrics", response_model=ReviewQueueMetricsPublic)
+def read_review_queue_metrics(
+    session: SessionDep, current_user: CurrentUser, daily_manual_capacity: int = 20
+) -> Any:
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
+    if daily_manual_capacity <= 0:
+        raise HTTPException(status_code=400, detail="daily_manual_capacity must be > 0")
+
+    queue_rows = session.exec(
+        select(CitizenshipApplication).where(
+            col(CitizenshipApplication.status).in_(MANUAL_QUEUE_STATUSES)
+        )
+    ).all()
+
+    pending_manual_count = len(queue_rows)
+    overdue_count = sum(1 for row in queue_rows if is_application_overdue(row))
+    high_priority_count = sum(1 for row in queue_rows if row.priority_score >= 75)
+
+    now = get_datetime_utc()
+    waiting_days = [
+        max(0, (now - (row.created_at or now)).total_seconds() / 86400)
+        for row in queue_rows
+    ]
+    avg_waiting_days = round(sum(waiting_days) / len(waiting_days), 2) if waiting_days else 0
+
+    estimated_days_to_clear_backlog = round(
+        pending_manual_count / daily_manual_capacity, 2
+    )
+
+    return ReviewQueueMetricsPublic(
+        pending_manual_count=pending_manual_count,
+        overdue_count=overdue_count,
+        high_priority_count=high_priority_count,
+        avg_waiting_days=avg_waiting_days,
+        daily_manual_capacity=daily_manual_capacity,
+        estimated_days_to_clear_backlog=estimated_days_to_clear_backlog,
+    )
 
 
 @router.get("/{application_id}", response_model=CitizenshipApplicationPublic)
@@ -287,6 +411,17 @@ def process_application_documents(application_id: uuid.UUID) -> None:
         passed_rules = sum(1 for rule in rules if rule.passed)
 
         risk_level = get_risk_level(confidence_score=confidence_score)
+        age_days = max(
+            0,
+            (get_datetime_utc() - (application.created_at or get_datetime_utc())).total_seconds()
+            / 86400,
+        )
+        priority_score = calculate_priority_score(
+            confidence_score=confidence_score,
+            risk_level=risk_level,
+            failed_documents=failed_documents,
+            age_days=age_days,
+        )
         recommendation = get_recommendation(
             confidence_score=confidence_score,
             processed_documents=processed_documents,
@@ -300,6 +435,8 @@ def process_application_documents(application_id: uuid.UUID) -> None:
             f"Risk level: {risk_level}."
         )
         application.confidence_score = round(confidence_score, 2)
+        application.priority_score = priority_score
+        application.sla_due_at = calculate_sla_due_at(risk_level=risk_level)
         application.updated_at = get_datetime_utc()
         session.add(application)
         add_audit_event(
@@ -311,6 +448,10 @@ def process_application_documents(application_id: uuid.UUID) -> None:
             metadata={
                 "confidence_score": application.confidence_score,
                 "risk_level": risk_level,
+                "priority_score": application.priority_score,
+                "sla_due_at": (
+                    application.sla_due_at.isoformat() if application.sla_due_at else None
+                ),
                 "processed_documents": processed_documents,
                 "failed_documents": failed_documents,
             },
@@ -500,6 +641,8 @@ def queue_application_processing(
             session.add(document)
 
     application.status = ApplicationStatus.QUEUED.value
+    application.priority_score = 0
+    application.sla_due_at = None
     application.updated_at = get_datetime_utc()
     session.add(application)
     add_audit_event(
@@ -576,6 +719,15 @@ def submit_review_decision(
     application.final_decision_reason = decision_in.reason
     application.final_decision_by_id = current_user.id
     application.final_decision_at = get_datetime_utc()
+    if final_status in {
+        ApplicationStatus.APPROVED.value,
+        ApplicationStatus.REJECTED.value,
+    }:
+        application.priority_score = 0
+        application.sla_due_at = None
+    else:
+        application.sla_due_at = get_datetime_utc() + timedelta(days=14)
+        application.priority_score = max(application.priority_score, 70)
     application.updated_at = get_datetime_utc()
     session.add(application)
     add_audit_event(

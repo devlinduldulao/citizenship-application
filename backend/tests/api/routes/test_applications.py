@@ -100,6 +100,12 @@ def test_upload_and_process_application(
     assert isinstance(breakdown_content["rules"], list)
     assert len(breakdown_content["rules"]) > 0
 
+    queue_metrics_response = client.get(
+        f"{settings.API_V1_STR}/applications/queue/metrics",
+        headers=normal_user_token_headers,
+    )
+    assert queue_metrics_response.status_code == 403
+
 
 def test_review_decision_by_superuser(
     client: TestClient,
@@ -177,3 +183,60 @@ def test_review_decision_requires_superuser(
         decision_response.json()["detail"]
         == "The user doesn't have enough privileges"
     )
+
+
+def test_review_queue_and_metrics_for_superuser(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    superuser_token_headers: dict[str, str],
+) -> None:
+    create_response = client.post(
+        f"{settings.API_V1_STR}/applications/",
+        headers=normal_user_token_headers,
+        json={
+            "applicant_full_name": "Queue Candidate",
+            "applicant_nationality": "Thai",
+            "notes": "Queue metrics coverage",
+        },
+    )
+    assert create_response.status_code == 200
+    application_id = create_response.json()["id"]
+
+    upload_response = client.post(
+        f"{settings.API_V1_STR}/applications/{application_id}/documents",
+        headers=normal_user_token_headers,
+        data={"document_type": "passport"},
+        files={
+            "file": (
+                "passport.pdf",
+                b"%PDF-1.4 queue candidate",
+                "application/pdf",
+            )
+        },
+    )
+    assert upload_response.status_code == 200
+
+    process_response = client.post(
+        f"{settings.API_V1_STR}/applications/{application_id}/process",
+        headers=normal_user_token_headers,
+        json={"force_reprocess": False},
+    )
+    assert process_response.status_code == 200
+
+    queue_response = client.get(
+        f"{settings.API_V1_STR}/applications/queue/review",
+        headers=superuser_token_headers,
+    )
+    assert queue_response.status_code == 200
+    queue_content = queue_response.json()
+    assert queue_content["count"] >= 1
+    assert any(row["id"] == application_id for row in queue_content["data"])
+
+    queue_metrics_response = client.get(
+        f"{settings.API_V1_STR}/applications/queue/metrics",
+        headers=superuser_token_headers,
+    )
+    assert queue_metrics_response.status_code == 200
+    metrics_content = queue_metrics_response.json()
+    assert metrics_content["pending_manual_count"] >= 1
+    assert "estimated_days_to_clear_backlog" in metrics_content

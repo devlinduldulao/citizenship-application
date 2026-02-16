@@ -9,6 +9,17 @@ The frontend is the review dashboard for the citizenship automation MVP, built w
 - Explainable AI/rule insights (confidence, risk, per-rule rationale)
 - Caseworker final decision actions with mandatory reason
 - Audit trail timeline for accountability and traceability
+- Reviewer workload dashboard with queue and SLA metrics
+
+## Reviewer Ops Playbook
+
+On the `Applications` page, use this sequence for daily review operations:
+
+1. Check queue metric cards and prioritize overdue workload first.
+2. Open top-priority pending-manual applications from the review queue.
+3. Verify decision breakdown and uploaded evidence.
+4. Complete `approve`, `reject`, or `request_more_info` with mandatory reason.
+5. Confirm timeline/audit entries for handoff and supervision.
 
 ## Requirements
 
@@ -28,27 +39,6 @@ After login, the main MVP workflow is on the `Applications` page.
 Notice that this live server is not running inside Docker, it's for local development, and that is the recommended workflow. Once you are happy with your frontend, you can build the frontend Docker image and start it, to test it in a production-like environment. But building the image at every change will not be as productive as running the local development server with live reload.
 
 Check the file `package.json` to see other available options.
-
-### Removing the frontend
-
-If you are developing an API-only app and want to remove the frontend, you can do it easily:
-
-* Remove the `./frontend` directory.
-
-* In the `compose.yml` file, remove the whole service / section `frontend`.
-
-* In the `compose.override.yml` file, remove the whole service / section `frontend` and `playwright`.
-
-Done, you have a frontend-less (api-only) app. 🤓
-
----
-
-If you want, you can also remove the `FRONTEND` environment variables from:
-
-* `.env`
-* `./scripts/*.sh`
-
-But it would be only to clean them up, leaving them won't really have any effect either way.
 
 ## Generate Client
 
@@ -78,16 +68,6 @@ bun run generate-client
 * Commit the changes.
 
 Notice that everytime the backend changes (changing the OpenAPI schema), you should follow these steps again to update the frontend client.
-
-## Using a Remote API
-
-If you want to use a remote API, you can set the environment variable `VITE_API_URL` to the URL of the remote API. For example, you can set it in the `frontend/.env` file:
-
-```env
-VITE_API_URL=https://api.my-domain.example.com
-```
-
-Then, when you run the frontend, it will use that URL as the base URL for the API.
 
 ## Code Structure
 
