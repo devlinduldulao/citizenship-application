@@ -35,7 +35,7 @@ Each subproject has its own `AGENTS.md` with detailed conventions. **The nearest
 | Frontend   | React 19, Vite 7, TanStack Router/Query, Zod 4 | bun             |
 | Styling    | Tailwind CSS 4, shadcn/ui (Radix primitives)   | —               |
 | Database   | PostgreSQL 18                                   | —               |
-| Auth       | JWT (python-jose/PyJWT + passlib/pwdlib)        | —               |
+| Auth       | JWT (PyJWT + pwdlib[argon2,bcrypt])             | —               |
 | Testing    | Pytest (backend), Playwright (frontend E2E)     | —               |
 | Linting    | Ruff (backend), Biome (frontend)                | —               |
 | Infra      | Docker Compose, Traefik reverse proxy           | —               |

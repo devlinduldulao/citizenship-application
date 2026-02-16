@@ -1,454 +1,399 @@
-# FastAPI Demo — Agent Instructions
+# Norwegian Citizenship Automation — Backend Agent Instructions
 
 > IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks in this project.
+> Always explore the project structure before writing code.
 
 ## Tech Stack
 
-| Category         | Technology            | Version      |
-| ---------------- | --------------------- | ------------ |
-| Language         | Python                | 3.14.x       |
-| Framework        | FastAPI               | 0.115.x      |
-| ASGI Server      | Uvicorn               | 0.34.x       |
-| Validation       | Pydantic              | 2.11.x       |
-| ORM              | SQLAlchemy            | 2.0.x        |
-| Migrations       | Alembic               | 1.15.x       |
-| Database         | PostgreSQL / SQLite   | Latest       |
-| Authentication   | python-jose + passlib | Latest       |
-| Testing          | pytest + httpx        | 8.x + 0.28.x |
-| Package Manager  | uv                    | 0.7.x        |
-| Linting          | Ruff                  | 0.9.x        |
-| Type Checking    | mypy / pyright        | Latest       |
-| Task Queue       | Celery / ARQ          | Latest       |
-| Containerization | Docker                | Latest       |
+| Category         | Technology                  | Version / Constraint      |
+| ---------------- | --------------------------- | ------------------------- |
+| Language         | Python                      | >=3.10, <4.0              |
+| Framework        | FastAPI                     | >=0.114.2, <1.0.0         |
+| ORM / Schemas    | SQLModel (wraps SQLAlchemy) | >=0.0.21, <1.0.0          |
+| Validation       | Pydantic                    | >2.0                      |
+| Settings         | pydantic-settings           | >=2.2.1, <3.0.0           |
+| Migrations       | Alembic                     | >=1.12.1, <2.0.0          |
+| Database         | PostgreSQL                  | 18 (via Docker Compose)   |
+| Auth (JWT)       | PyJWT                       | >=2.8.0, <3.0.0           |
+| Auth (passwords) | pwdlib[argon2,bcrypt]       | >=0.3.0                   |
+| HTTP Client      | httpx                       | >=0.25.1, <1.0.0          |
+| Testing          | pytest                      | >=7.4.3, <8.0.0           |
+| Coverage         | coverage                    | >=7.4.3, <8.0.0           |
+| Linting          | Ruff                        | >=0.2.2, <1.0.0           |
+| Type Checking    | mypy (strict)               | >=1.8.0, <2.0.0           |
+| Package Manager  | uv                          | Latest                    |
+| Pre-commit       | prek                        | >=0.2.24, <1.0.0          |
+| Containerization | Docker                      | Latest                    |
 
 ## Setup Commands
 
 ```bash
-uv sync                          # Install dependencies from pyproject.toml
-uv run fastapi dev                # Start dev server (hot reload, port 8000)
-uv run fastapi run                # Start production server
-uv run pytest                     # Run all tests
-uv run pytest --cov=app           # Run tests with coverage
-uv run mypy app/                  # Type check
-uv run ruff check .               # Lint check
-uv run ruff format .              # Format code
-uv run alembic upgrade head       # Run database migrations
+uv sync                              # Install dependencies from pyproject.toml
+uv run fastapi dev app/main.py       # Dev server with hot reload on :8000
+uv run fastapi run app/main.py       # Production server
+uv run pytest                         # Run all tests
+uv run pytest --cov=app               # Tests with coverage report
+uv run mypy app/                      # Type check (strict mode)
+uv run ruff check .                   # Lint
+uv run ruff format .                  # Format
+uv run alembic upgrade head           # Run database migrations
 uv run alembic revision --autogenerate -m "description"  # Generate migration
-uv add <package>                  # Add dependency
-uv add --dev <package>            # Add dev dependency
+uv run alembic downgrade -1           # Rollback one migration
+uv run alembic history                # View migration history
+uv add <package>                      # Add production dependency
+uv add --dev <package>                # Add dev dependency
+uv run prek install -f                # Install pre-commit hooks
 ```
 
 ## Project Structure
 
 ```
-project-root/
-├── pyproject.toml                 # Project config, dependencies, tool settings
-├── uv.lock                       # Lock file (do NOT edit manually)
-├── alembic.ini                    # Alembic config
-├── alembic/                       # Migration scripts
-│   ├── env.py
-│   └── versions/
-├── app/                           # Application package
+backend/
+├── pyproject.toml                     # Dependencies, Ruff config, mypy config, coverage config
+├── alembic.ini                        # Alembic configuration
+├── app/
 │   ├── __init__.py
-│   ├── main.py                    # FastAPI app factory, lifespan
-│   ├── config.py                  # Settings via pydantic-settings
-│   ├── database.py                # SQLAlchemy engine + session factory
-│   ├── dependencies.py            # Shared FastAPI dependencies
-│   ├── models/                    # SQLAlchemy ORM models
-│   │   ├── __init__.py
-│   │   ├── base.py                # Declarative base + mixins
-│   │   ├── user.py
-│   │   └── item.py
-│   ├── schemas/                   # Pydantic schemas (request/response)
-│   │   ├── __init__.py
-│   │   ├── user.py
-│   │   └── item.py
-│   ├── routers/                   # API route modules
-│   │   ├── __init__.py
-│   │   ├── users.py
-│   │   └── items.py
-│   ├── services/                  # Business logic layer
-│   │   ├── __init__.py
-│   │   ├── user_service.py
-│   │   └── item_service.py
-│   ├── repositories/              # Data access layer
-│   │   ├── __init__.py
-│   │   ├── base.py                # Generic CRUD repository
-│   │   └── user_repository.py
-│   └── middleware/                 # Custom middleware
-│       ├── __init__.py
-│       └── logging.py
-├── tests/                         # Test package
-│   ├── __init__.py
-│   ├── conftest.py                # Shared fixtures
-│   ├── test_users.py              # Router/integration tests
-│   ├── test_user_service.py       # Service unit tests
-│   └── factories.py               # Test data factories
-└── scripts/                       # Utility scripts
-    └── seed_db.py
+│   ├── main.py                        # FastAPI app instance, CORS, router registration
+│   ├── models.py                      # ALL SQLModel tables + Pydantic schemas (single file)
+│   ├── crud.py                        # ALL database operations (flat functions, not classes)
+│   ├── utils.py                       # Email utilities
+│   ├── initial_data.py                # Seed script for first superuser
+│   ├── backend_pre_start.py           # DB readiness check
+│   ├── tests_pre_start.py             # Test DB readiness check
+│   ├── core/
+│   │   ├── config.py                  # Pydantic Settings (reads ../.env)
+│   │   ├── db.py                      # Sync SQLModel engine + init_db()
+│   │   └── security.py                # JWT creation + password hashing (PyJWT + pwdlib)
+│   ├── api/
+│   │   ├── main.py                    # APIRouter aggregation
+│   │   ├── deps.py                    # Dependency injection (SessionDep, CurrentUser, etc.)
+│   │   └── routes/
+│   │       ├── applications.py        # Citizenship app CRUD + docs + processing + review + audit
+│   │       ├── users.py               # User management (admin)
+│   │       ├── items.py               # Items CRUD (demo resource)
+│   │       ├── login.py               # Auth endpoints (token, password reset)
+│   │       ├── utils.py               # Health check, test email
+│   │       └── private.py             # Dev-only routes (local environment)
+│   ├── alembic/
+│   │   ├── env.py
+│   │   └── versions/                  # Migration scripts
+│   └── email-templates/               # Jinja2 email templates
+├── data/
+│   └── uploads/                       # File upload storage (per-application UUID dirs)
+├── tests/
+│   ├── conftest.py                    # Fixtures: db session, TestClient, auth token headers
+│   ├── api/routes/                    # Integration tests per route module
+│   │   ├── test_applications.py
+│   │   ├── test_items.py
+│   │   ├── test_login.py
+│   │   ├── test_users.py
+│   │   └── test_private.py
+│   ├── crud/
+│   │   └── test_user.py              # CRUD unit tests
+│   ├── scripts/                       # Pre-start script tests
+│   └── utils/                         # Test helper utilities
+├── scripts/
+│   ├── prestart.sh                    # Docker prestart (migrations + seed)
+│   ├── test.sh                        # Test runner script
+│   ├── tests-start.sh                 # Test startup script
+│   ├── lint.sh                        # Lint script
+│   └── format.sh                      # Format script
+└── htmlcov/                           # Coverage HTML reports
 ```
 
 ## Critical Conventions
 
-### Naming
+### Architecture — Flat CRUD, NOT Service/Repository
 
-- **Files/Modules**: `snake_case.py` (e.g., `user_service.py`, `item_repository.py`)
-- **Classes**: `PascalCase` (e.g., `UserService`, `ItemSchema`)
-- **Functions/Methods**: `snake_case` (e.g., `get_user_by_id`, `create_item`)
-- **Variables**: `snake_case` (NEVER `camelCase`)
-- **Constants**: `UPPER_SNAKE_CASE` (e.g., `MAX_RETRIES`, `DEFAULT_PAGE_SIZE`)
-- **Pydantic Models**: `PascalCase` with purpose suffix (`UserCreate`, `UserResponse`, `UserUpdate`)
-- **SQLAlchemy Models**: `PascalCase` singular noun (`User`, `Item`, `Order`)
-- **Endpoints**: `snake_case` paths (e.g., `/api/v1/user_profiles`)
-- **Type aliases**: `PascalCase` (e.g., `UserId = int`)
+This project uses a **flat architecture** — NOT the service/repository pattern:
 
-### Python 3.14 Key Features
+- `app/models.py` — ALL SQLModel table definitions AND Pydantic request/response schemas in one file
+- `app/crud.py` — ALL database operations as standalone functions (not classes)
+- `app/api/routes/` — Route handlers that call CRUD functions directly or do inline queries
+- `app/api/deps.py` — FastAPI dependency injection (session, auth)
 
 ```python
-# ✅ Template strings (PEP 750) — t-strings for safe string processing
-from string.templatelib import Template
+# ✅ Correct — This project's pattern: flat CRUD functions with sync sessions
+from sqlmodel import Session, select
+from app.models import User, UserCreate
+from app.core.security import get_password_hash
 
-name = "world"
-template = t"Hello, {name}!"  # Returns Template object, NOT a string
+def create_user(*, session: Session, user_create: UserCreate) -> User:
+    db_obj = User.model_validate(
+        user_create, update={"hashed_password": get_password_hash(user_create.password)}
+    )
+    session.add(db_obj)
+    session.commit()
+    session.refresh(db_obj)
+    return db_obj
 
-# ✅ Deferred evaluation of annotations (PEP 649)
-# No more need for `from __future__ import annotations`
-# Forward references work natively
-class Node:
-    def __init__(self, value: int, next: Node | None = None):  # Just works!
-        self.value = value
-        self.next = next
-
-# ✅ Multiple interpreters (PEP 734)
-from concurrent.interpreters import Interpreter, create
-
-# ✅ Free-threaded mode is officially supported (PEP 779)
-# No GIL for true multi-core parallelism
-
-# ✅ except without parentheses (PEP 758)
-try:
-    do_something()
-except ValueError, TypeError:  # No need for (ValueError, TypeError)
-    handle_error()
+# ❌ Wrong — Do NOT create service classes or repository classes
+# ❌ Wrong — Do NOT use async sessions (this project uses sync SQLModel)
 ```
 
-### FastAPI Route Pattern
+### SQLModel Pattern (NOT raw SQLAlchemy)
 
 ```python
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+# ✅ Correct — SQLModel tables use Field() and Relationship()
+import uuid
+from sqlmodel import Field, Relationship, SQLModel
 
-from app.database import get_session
-from app.schemas.user import UserCreate, UserResponse, UserUpdate
-from app.services.user_service import UserService
+class User(UserBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    hashed_password: str
+    items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
 
-router = APIRouter(prefix="/api/v1/users", tags=["users"])
-
-
-# ✅ Dependency injection via Depends()
-def get_user_service(session: AsyncSession = Depends(get_session)) -> UserService:
-    return UserService(session)
-
-
-@router.get("/{user_id}", response_model=UserResponse)
-async def get_user(
-    user_id: int,
-    service: UserService = Depends(get_user_service),
-) -> UserResponse:
-    user = await service.get_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
-
-
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(
-    data: UserCreate,
-    service: UserService = Depends(get_user_service),
-) -> UserResponse:
-    return await service.create(data)
-
-
-@router.patch("/{user_id}", response_model=UserResponse)
-async def update_user(
-    user_id: int,
-    data: UserUpdate,
-    service: UserService = Depends(get_user_service),
-) -> UserResponse:
-    user = await service.update(user_id, data)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
+# ❌ Wrong — Do NOT use SQLAlchemy's Mapped[], mapped_column(), Base
+# ❌ Wrong — Do NOT create separate model files; everything goes in app/models.py
 ```
 
-### Pydantic Schema Pattern
+### Schemas and Models Live Together
 
 ```python
-from datetime import datetime
+# ✅ Correct — Pydantic schemas are SQLModel classes (without table=True) in app/models.py
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+# Base (shared fields)
+class CitizenshipApplicationBase(SQLModel):
+    applicant_full_name: str = Field(min_length=1, max_length=255)
+    applicant_nationality: str = Field(min_length=1, max_length=128)
 
+# Create schema
+class CitizenshipApplicationCreate(CitizenshipApplicationBase):
+    pass
 
-# ✅ Separate schemas for Create, Update, Response
-class UserBase(BaseModel):
-    """Shared fields — base class is never used directly."""
-    name: str = Field(..., min_length=1, max_length=100)
-    email: EmailStr
+# Update schema (all optional)
+class CitizenshipApplicationUpdate(SQLModel):
+    applicant_full_name: str | None = Field(default=None, min_length=1, max_length=255)
 
+# Table (database model)
+class CitizenshipApplication(CitizenshipApplicationBase, table=True):
+    __tablename__ = "citizenship_application"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    status: str = Field(default=ApplicationStatus.DRAFT.value, max_length=32)
+    # ...relationships, timestamps, etc.
 
-class UserCreate(UserBase):
-    """Fields required when creating a user."""
-    password: str = Field(..., min_length=8)
+# Public response schema
+class CitizenshipApplicationPublic(CitizenshipApplicationBase):
+    id: uuid.UUID
+    status: ApplicationStatus
+    # ...
 
-
-class UserUpdate(BaseModel):
-    """All fields optional for partial updates (PATCH)."""
-    name: str | None = None
-    email: EmailStr | None = None
-
-
-class UserResponse(UserBase):
-    """Fields returned to the client — NEVER expose passwords."""
-    id: int
-    created_at: datetime
-
-    # ✅ Pydantic v2: model_config replaces class Config
-    model_config = ConfigDict(from_attributes=True)
-```
-
-### SQLAlchemy Model Pattern
-
-```python
-from datetime import datetime
-
-from sqlalchemy import String, func
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.models.base import Base
-
-
-class User(Base):
-    __tablename__ = "users"
-
-    # ✅ SQLAlchemy 2.0 Mapped types (not Column)
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100))
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    hashed_password: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-
-    def __repr__(self) -> str:
-        return f"User(id={self.id!r}, name={self.name!r})"
-```
-
-### Service Pattern
-
-```python
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models.user import User
-from app.schemas.user import UserCreate, UserUpdate
-
-
-class UserService:
-    """Business logic for user operations."""
-
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
-
-    async def get_by_id(self, user_id: int) -> User | None:
-        return await self._session.get(User, user_id)
-
-    async def create(self, data: UserCreate) -> User:
-        user = User(
-            name=data.name,
-            email=data.email,
-            hashed_password=hash_password(data.password),
-        )
-        self._session.add(user)
-        await self._session.commit()
-        await self._session.refresh(user)
-        return user
-
-    async def update(self, user_id: int, data: UserUpdate) -> User | None:
-        user = await self.get_by_id(user_id)
-        if not user:
-            return None
-        # ✅ Pydantic v2: model_dump(exclude_unset=True) for partial updates
-        update_data = data.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(user, field, value)
-        await self._session.commit()
-        await self._session.refresh(user)
-        return user
-
-    async def list_all(self, skip: int = 0, limit: int = 100) -> list[User]:
-        result = await self._session.execute(
-            select(User).offset(skip).limit(limit)
-        )
-        return list(result.scalars().all())
+# ❌ Wrong — Do NOT create app/schemas/ directory
+# ❌ Wrong — Do NOT use plain Pydantic BaseModel; use SQLModel for everything
 ```
 
 ### Dependency Injection Pattern
 
 ```python
-from collections.abc import AsyncGenerator
-from functools import lru_cache
+# ✅ Correct — Sync session via generator, annotated dependencies
+from collections.abc import Generator
+from typing import Annotated
+from fastapi import Depends
+from sqlmodel import Session
+from app.core.db import engine
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
-from app.config import Settings
-
-
-# ✅ Settings cached with lru_cache
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
-
-
-# ✅ Async engine + session factory
-engine = create_async_engine(get_settings().database_url, echo=False)
-async_session = async_sessionmaker(engine, expire_on_commit=False)
-
-
-# ✅ Session dependency — yields for proper cleanup
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session() as session:
+def get_db() -> Generator[Session, None, None]:
+    with Session(engine) as session:
         yield session
+
+SessionDep = Annotated[Session, Depends(get_db)]
+TokenDep = Annotated[str, Depends(reusable_oauth2)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+# ❌ Wrong — Do NOT use AsyncSession, async_sessionmaker, or create_async_engine
 ```
 
-### Configuration via pydantic-settings
+### Route Pattern
 
 ```python
+# ✅ Correct — Routes use SessionDep and CurrentUser, sync def (not async)
+from app.api.deps import CurrentUser, SessionDep
+
+router = APIRouter(prefix="/applications", tags=["applications"])
+
+@router.get("/", response_model=CitizenshipApplicationsPublic)
+def list_applications(
+    session: SessionDep,
+    current_user: CurrentUser,
+    skip: int = 0,
+    limit: int = 100,
+) -> CitizenshipApplicationsPublic:
+    statement = select(CitizenshipApplication).where(
+        CitizenshipApplication.owner_id == current_user.id
+    )
+    results = session.exec(statement).all()
+    return CitizenshipApplicationsPublic(data=results, count=len(results))
+
+# ❌ Wrong — Do NOT use async def for route handlers
+# ❌ Wrong — Do NOT inject service classes via Depends
+```
+
+### Auth Pattern (PyJWT + pwdlib)
+
+```python
+# ✅ Correct — PyJWT for tokens, pwdlib for password hashing
+import jwt
+from pwdlib import PasswordHash
+from pwdlib.hashers.argon2 import Argon2Hasher
+from pwdlib.hashers.bcrypt import BcryptHasher
+
+password_hash = PasswordHash((Argon2Hasher(), BcryptHasher()))
+
+def create_access_token(subject: str, expires_delta: timedelta) -> str:
+    expire = datetime.now(timezone.utc) + expires_delta
+    to_encode = {"exp": expire, "sub": str(subject)}
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
+
+def verify_password(plain_password: str, hashed_password: str) -> tuple[bool, str | None]:
+    return password_hash.verify_and_update(plain_password, hashed_password)
+
+# ❌ Wrong — Do NOT use python-jose or passlib (not in this project)
+```
+
+### Configuration Pattern
+
+```python
+# ✅ Correct — Pydantic Settings reading from ../.env (one level above backend/)
+from pydantic import computed_field, PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    model_config = SettingsConfigDict(
+        env_file="../.env", env_ignore_empty=True, extra="ignore"
+    )
 
-    # ✅ pydantic-settings reads from .env automatically
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    API_V1_STR: str = "/api/v1"
+    SECRET_KEY: str
+    POSTGRES_SERVER: str
+    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
 
-    app_name: str = "FastAPI Demo"
-    debug: bool = False
-    database_url: str = "sqlite+aiosqlite:///./dev.db"
-    secret_key: str = "change-me-in-production"
-    access_token_expire_minutes: int = 30
-    cors_origins: list[str] = ["http://localhost:3000"]
+    @computed_field
+    @property
+    def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:
+        return PostgresDsn.build(
+            scheme="postgresql+psycopg",
+            username=self.POSTGRES_USER,
+            password=self.POSTGRES_PASSWORD,
+            host=self.POSTGRES_SERVER,
+            port=self.POSTGRES_PORT,
+            path=self.POSTGRES_DB,
+        )
 ```
 
 ### Testing Pattern
 
 ```python
+# ✅ Correct — Sync TestClient, session-scoped db fixture, module-scoped client
 import pytest
-from httpx import ASGITransport, AsyncClient
+from collections.abc import Generator
+from fastapi.testclient import TestClient
+from sqlmodel import Session
 
-from app.main import create_app
-from app.database import get_session
-from app.config import Settings
+from app.core.db import engine, init_db
+from app.main import app
 
+@pytest.fixture(scope="session", autouse=True)
+def db() -> Generator[Session, None, None]:
+    with Session(engine) as session:
+        init_db(session)
+        yield session
 
-# ✅ Async test fixtures with pytest-asyncio
-@pytest.fixture
-async def app():
-    """Create app instance for testing."""
-    return create_app()
+@pytest.fixture(scope="module")
+def client() -> Generator[TestClient, None, None]:
+    with TestClient(app) as c:
+        yield c
 
-
-@pytest.fixture
-async def client(app) -> AsyncClient:
-    """Async test client using httpx."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as client:
-        yield client
-
-
-# ✅ Integration test — tests the full HTTP pipeline
-@pytest.mark.asyncio
-async def test_create_user(client: AsyncClient):
-    response = await client.post(
-        "/api/v1/users/",
-        json={"name": "John", "email": "john@example.com", "password": "securepass123"},
+def test_create_application(
+    client: TestClient, superuser_token_headers: dict[str, str]
+):
+    response = client.post(
+        "/api/v1/applications/",
+        headers=superuser_token_headers,
+        json={
+            "applicant_full_name": "Test User",
+            "applicant_nationality": "Norwegian",
+        },
     )
-    assert response.status_code == 201
-    data = response.json()
-    assert data["name"] == "John"
-    assert data["email"] == "john@example.com"
-    assert "password" not in data  # Never leak password
+    assert response.status_code == 200
 
-
-@pytest.mark.asyncio
-async def test_get_user_not_found(client: AsyncClient):
-    response = await client.get("/api/v1/users/99999")
-    assert response.status_code == 404
-
-
-# ✅ Service unit test — mock the database session
-@pytest.mark.asyncio
-async def test_user_service_create(mock_session):
-    from app.services.user_service import UserService
-    from app.schemas.user import UserCreate
-
-    service = UserService(mock_session)
-    data = UserCreate(name="Jane", email="jane@example.com", password="securepass123")
-
-    user = await service.create(data)
-    assert user.name == "Jane"
-    mock_session.add.assert_called_once()
-    mock_session.commit.assert_awaited_once()
+# ❌ Wrong — Do NOT use AsyncClient, ASGITransport, or pytest.mark.asyncio
+# ❌ Wrong — Do NOT use httpx directly; use FastAPI's TestClient
 ```
+
+### Naming
+
+- **Files/Modules**: `snake_case.py`
+- **Classes**: `PascalCase` (e.g., `CitizenshipApplication`, `UserCreate`)
+- **Functions/Methods**: `snake_case` (e.g., `create_user`, `get_owned_application`)
+- **Variables**: `snake_case`
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `UPLOAD_ROOT`, `ALLOWED_CONTENT_TYPES`)
+- **SQLModel tables**: `PascalCase` singular (`User`, `CitizenshipApplication`)
+- **Pydantic schemas**: `PascalCase` with purpose suffix (`UserCreate`, `UserPublic`, `UserUpdate`)
+- **Enums**: `PascalCase` class, `UPPER_SNAKE_CASE` values (`ApplicationStatus.DRAFT`)
+
+## Domain Models
+
+Key SQLModel tables (all in `app/models.py`):
+
+| Model                      | Purpose                                              |
+| -------------------------- | ---------------------------------------------------- |
+| `User`                     | Auth users (email, hashed_password, is_superuser)    |
+| `Item`                     | Demo resource (owner_id FK to User)                  |
+| `CitizenshipApplication`   | Main entity — status, scores, SLA, decision fields   |
+| `ApplicationDocument`      | Uploaded files (PDF/image) with OCR extraction fields |
+| `EligibilityRuleResult`    | Individual rule scores with rationale and evidence   |
+| `ApplicationAuditEvent`    | Immutable audit trail entries                        |
+
+### Application Status Flow
+
+```
+draft → documents_uploaded → queued → processing → review_ready → approved | rejected | more_info_required
+```
+
+### Review Decision Actions
+
+`approve`, `reject`, `request_more_info` — all require mandatory reason text (min 8 chars).
+
+### File Uploads
+
+- Storage root: `data/uploads/{application_id}/`
+- Allowed MIME types: `application/pdf`, `image/jpeg`, `image/png`, `image/webp`
+- Documents tracked via `ApplicationDocument` table with OCR/extraction fields
+
+### Review Queue & SLA
+
+- `priority_score` (0–100): ranks manual-review workload
+- `sla_due_at`: deadline for reviewer action
+- Queue endpoints: `GET /api/v1/applications/queue/review`, `GET /api/v1/applications/queue/metrics`
+- Metrics: `pending_manual_count`, `overdue_count`, `high_priority_count`, `avg_waiting_days`
 
 ## Common Tasks
 
 ### Add a new API resource
 
-1. Create SQLAlchemy model in `app/models/`
-2. Create Pydantic schemas in `app/schemas/` (Create, Update, Response)
-3. Create service in `app/services/` with business logic
-4. Create router in `app/routers/` with endpoints
-5. Register router in `app/main.py`
-6. Generate Alembic migration: `uv run alembic revision --autogenerate -m "add X table"`
-7. Run migration: `uv run alembic upgrade head`
-8. Write tests in `tests/`
+1. Add SQLModel table + Pydantic schemas to `app/models.py`
+2. Add CRUD functions to `app/crud.py` (if shared logic needed)
+3. Create route file in `app/api/routes/`
+4. Register router in `app/api/main.py`
+5. Generate migration: `uv run alembic revision --autogenerate -m "add X table"`
+6. Run migration: `uv run alembic upgrade head`
+7. Write tests in `tests/api/routes/`
 
-### Add a new dependency
+### Add a field to an existing model
 
-```bash
-uv add <package>           # Production dependency
-uv add --dev <package>     # Development dependency
-```
-
-### Generate Alembic migration
-
-```bash
-uv run alembic revision --autogenerate -m "add user roles"
-uv run alembic upgrade head
-uv run alembic downgrade -1   # Rollback one migration
-uv run alembic history        # View migration history
-```
-
-## Detailed Documentation
-
-| Topic                  | Reference                                                               |
-| ---------------------- | ----------------------------------------------------------------------- |
-| FastAPI Docs           | [fastapi.tiangolo.com](https://fastapi.tiangolo.com/)                   |
-| Pydantic v2            | [docs.pydantic.dev](https://docs.pydantic.dev/latest/)                  |
-| SQLAlchemy 2.0         | [docs.sqlalchemy.org](https://docs.sqlalchemy.org/en/20/)               |
-| Alembic                | [alembic.sqlalchemy.org](https://alembic.sqlalchemy.org/)               |
-| uv Package Manager     | [docs.astral.sh/uv](https://docs.astral.sh/uv/)                         |
-| Ruff Linter            | [docs.astral.sh/ruff](https://docs.astral.sh/ruff/)                     |
-| Python 3.14 What's New | [docs.python.org](https://docs.python.org/3.14/whatsnew/3.14.html)      |
-| pytest-asyncio         | [pytest-asyncio.readthedocs.io](https://pytest-asyncio.readthedocs.io/) |
-| httpx                  | [www.python-httpx.org](https://www.python-httpx.org/)                   |
+1. Update the model class in `app/models.py`
+2. Update corresponding Create/Update/Public schemas in `app/models.py`
+3. Generate migration: `uv run alembic revision --autogenerate -m "add field to X"`
+4. Run migration: `uv run alembic upgrade head`
+5. Update tests
 
 ## PR/Commit Guidelines
 
-- Run `uv run ruff check . && uv run pytest` before committing
-- Add/update tests for any code changes
+- Run `uv run ruff check . && uv run ruff format . && uv run pytest` before committing
 - Run `uv run mypy app/` to verify type safety
-- Use descriptive commit messages
+- Add/update tests for any code changes
+- Include Alembic migrations for any model changes
 - Title format: `[module/feature] Description`
-- Ensure Alembic migrations are included for any model changes
