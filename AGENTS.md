@@ -21,7 +21,7 @@ Full-stack monorepo automating Norway's citizenship application process. Combine
 ├── frontend/            ← React SPA (Vite, TanStack Router, Tailwind CSS)
 │   ├── AGENTS.md        ← Frontend-specific agent instructions
 │   ├── src/             ← Source (routes, components, hooks, client)
-│   └── tests/           ← Playwright E2E tests
+│   └── tests/           ← Vitest unit tests
 └── scripts/             ← Cross-project utility scripts
 ```
 
@@ -32,11 +32,12 @@ Each subproject has its own `AGENTS.md` with detailed conventions. **The nearest
 | Layer      | Technology                                     | Package Manager |
 | ---------- | ---------------------------------------------- | --------------- |
 | Backend    | FastAPI 0.115, SQLModel, Pydantic 2, Alembic   | uv              |
+| AI/ML      | PyMuPDF, Tesseract OCR, spaCy (nb_core_news_sm), regex NLP | —   |
 | Frontend   | React 19, Vite 7, TanStack Router/Query, Zod 4 | bun             |
 | Styling    | Tailwind CSS 4, shadcn/ui (Radix primitives)   | —               |
 | Database   | PostgreSQL 18                                   | —               |
 | Auth       | JWT (PyJWT + pwdlib[argon2,bcrypt])             | —               |
-| Testing    | Pytest (backend), Playwright (frontend E2E)     | —               |
+| Testing    | Pytest (backend), Vitest (frontend unit)        | —               |
 | Linting    | Ruff (backend), Biome (frontend)                | —               |
 | Infra      | Docker Compose, Traefik reverse proxy           | —               |
 
@@ -74,7 +75,7 @@ bun install                          # Install dependencies
 bun run dev                          # Dev server on :5173
 bun run build                        # Production build
 bun run lint                         # Biome lint + format
-bun run test                         # Playwright E2E tests
+bun run test                         # Vitest unit tests
 bun run generate-client              # Regenerate API client from OpenAPI
 ```
 
@@ -148,7 +149,7 @@ Route structure: `__root.tsx` → `_layout.tsx` → `{admin,applications,items,s
 ## Testing Instructions
 
 - **Backend:** `cd backend && uv run pytest` — all tests must pass before committing
-- **Frontend E2E:** `cd frontend && bun run test` — Playwright tests against running stack
+- **Frontend unit:** `cd frontend && bun run test` — Vitest unit tests
 - **Coverage:** `uv run pytest --cov=app` for backend coverage report
 - Add or update tests for every code change, even if not explicitly asked
 

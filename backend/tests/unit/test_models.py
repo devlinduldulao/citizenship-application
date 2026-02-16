@@ -1,6 +1,5 @@
 """Unit tests for Pydantic/SQLModel schema validation."""
 
-import uuid
 
 import pytest
 from pydantic import ValidationError
@@ -12,14 +11,14 @@ from app.models import (
     DocumentStatus,
     ItemCreate,
     ItemUpdate,
+    NewPassword,
     ReviewDecisionAction,
     ReviewDecisionRequest,
+    UpdatePassword,
     UserCreate,
     UserRegister,
     UserUpdate,
     UserUpdateMe,
-    UpdatePassword,
-    NewPassword,
 )
 
 

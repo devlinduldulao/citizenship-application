@@ -8,19 +8,14 @@ from sqlmodel import Session, col, delete, func, select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.db import engine
-from app.services.nlp import ExtractedEntities, compute_document_nlp_score, extract_entities
-from app.services.ocr import extract_text
 from app.models import (
     ApplicationAuditEvent,
     ApplicationAuditEventPublic,
     ApplicationAuditTrailPublic,
-    ReviewQueueItemPublic,
-    ReviewQueueMetricsPublic,
-    ReviewQueuePublic,
+    ApplicationDecisionBreakdownPublic,
     ApplicationDocument,
     ApplicationDocumentPublic,
     ApplicationDocumentsPublic,
-    ApplicationDecisionBreakdownPublic,
     ApplicationProcessRequest,
     ApplicationStatus,
     CitizenshipApplication,
@@ -28,12 +23,21 @@ from app.models import (
     CitizenshipApplicationPublic,
     CitizenshipApplicationsPublic,
     DocumentStatus,
-    ReviewDecisionAction,
-    ReviewDecisionRequest,
     EligibilityRuleResult,
     EligibilityRuleResultPublic,
+    ReviewDecisionAction,
+    ReviewDecisionRequest,
+    ReviewQueueItemPublic,
+    ReviewQueueMetricsPublic,
+    ReviewQueuePublic,
     get_datetime_utc,
 )
+from app.services.nlp import (
+    ExtractedEntities,
+    compute_document_nlp_score,
+    extract_entities,
+)
+from app.services.ocr import extract_text
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -559,10 +563,8 @@ def evaluate_eligibility_rules(
 
     # NLP-enhanced signals
     nlp_has_passport_number = len(merged_entities.passport_numbers) > 0
-    nlp_has_dates = len(merged_entities.dates) >= 2  # e.g. birth + issue date
     nlp_has_language_signal = len(merged_entities.language_indicators) > 0
     nlp_has_residency_signal = len(merged_entities.residency_indicators) > 0
-    nlp_has_nationality = len(merged_entities.nationalities) > 0
 
     # Boost identity score if NLP found passport numbers in text
     identity_score = 1.0 if has_identity_document else 0.0

@@ -3,7 +3,11 @@
 import tempfile
 from pathlib import Path
 
-from app.services.nlp import ExtractedEntities, compute_document_nlp_score, extract_entities
+from app.services.nlp import (
+    ExtractedEntities,
+    compute_document_nlp_score,
+    extract_entities,
+)
 from app.services.ocr import ExtractionResult, extract_text, extract_text_from_pdf
 
 

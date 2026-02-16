@@ -9,6 +9,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
+
+try:
+    import spacy
+except Exception:  # pragma: no cover - optional runtime dependency safety
+    spacy = None  # type: ignore[assignment]
 
 
 @dataclass
@@ -126,6 +132,26 @@ _ADDRESS_PATTERNS = [
 ]
 
 
+@lru_cache(maxsize=1)
+def _load_spacy_model() -> object | None:
+    """Load spaCy model once; return None if unavailable.
+
+    Priority:
+    1) Norwegian model `nb_core_news_sm`
+    2) Multilingual model `xx_ent_wiki_sm`
+    """
+    if spacy is None:
+        return None
+
+    for model_name in ("nb_core_news_sm", "xx_ent_wiki_sm"):
+        try:
+            return spacy.load(model_name)
+        except Exception:
+            continue
+
+    return None
+
+
 def extract_entities(text: str) -> ExtractedEntities:
     """Extract structured entities from document text using regex NLP."""
     if not text or not text.strip():
@@ -198,6 +224,51 @@ def extract_entities(text: str) -> ExtractedEntities:
         matches = re.findall(pattern, text, re.IGNORECASE)
         entities.names.extend(m.strip() for m in matches if m.strip())
     entities.names = _dedupe(entities.names)
+
+    # spaCy NER enrichment (if model is available)
+    nlp_model = _load_spacy_model()
+    if nlp_model is not None:
+        try:
+            doc = nlp_model(text)
+            for ent in doc.ents:
+                value = ent.text.strip()
+                if not value:
+                    continue
+
+                # Person names
+                if ent.label_ in {"PER", "PERSON"}:
+                    entities.names.append(value)
+
+                # Places / addresses
+                if ent.label_ in {"GPE", "GPE_LOC", "LOC"}:
+                    entities.addresses.append(value)
+
+                # Date entities
+                if ent.label_ in {"DATE"}:
+                    entities.dates.append(value)
+
+                # Organizations that may indicate UDI/Politi/Kompetanse Norge
+                if ent.label_ in {"ORG"}:
+                    lower_value = value.lower()
+                    if any(
+                        token in lower_value
+                        for token in (
+                            "udi",
+                            "politi",
+                            "kompetanse norge",
+                            "utlendingsdirektoratet",
+                        )
+                    ):
+                        entities.keywords_found.append(value)
+        except Exception:
+            # Keep regex-only behavior on any runtime model issue
+            pass
+
+    # Deduplicate again after spaCy enrichment
+    entities.dates = _dedupe(entities.dates)
+    entities.names = _dedupe(entities.names)
+    entities.addresses = _dedupe(entities.addresses)
+    entities.keywords_found = _dedupe(entities.keywords_found)
 
     # Numeric values (years, amounts)
     numeric_matches = re.findall(

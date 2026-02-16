@@ -14,6 +14,25 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def _configure_tesseract() -> None:
+    """Set pytesseract binary path from settings if configured."""
+    try:
+        from app.core.config import settings
+
+        if settings.TESSERACT_CMD:
+            import pytesseract
+
+            pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
+            logger.info("Tesseract binary set to: %s", settings.TESSERACT_CMD)
+    except Exception:
+        # Settings may not be available in test/import contexts — that's fine,
+        # pytesseract will fall back to PATH lookup.
+        pass
+
+
+_configure_tesseract()
+
+
 @dataclass
 class ExtractionResult:
     """Result of text extraction from a single document."""

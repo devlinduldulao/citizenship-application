@@ -140,7 +140,9 @@ const fetchJson = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   })
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: "Request failed" }))
+    const body = await response
+      .json()
+      .catch(() => ({ detail: "Request failed" }))
     throw new Error(body.detail || "Request failed")
   }
 
@@ -227,20 +229,25 @@ function ApplicationsPage() {
   const reviewQueueQuery = useQuery({
     queryKey: ["review-queue"],
     queryFn: () =>
-      fetchJson<ReviewQueueResponse>("/api/v1/applications/queue/review?skip=0&limit=5"),
+      fetchJson<ReviewQueueResponse>(
+        "/api/v1/applications/queue/review?skip=0&limit=5",
+      ),
     enabled: Boolean(currentUser?.is_superuser),
   })
 
   const reviewQueueMetricsQuery = useQuery({
     queryKey: ["review-queue-metrics"],
-    queryFn: () => fetchJson<ReviewQueueMetrics>("/api/v1/applications/queue/metrics"),
+    queryFn: () =>
+      fetchJson<ReviewQueueMetrics>("/api/v1/applications/queue/metrics"),
     enabled: Boolean(currentUser?.is_superuser),
   })
 
   const applicationsQuery = useQuery({
     queryKey: ["citizenship-applications"],
     queryFn: () =>
-      fetchJson<CitizenshipApplicationList>("/api/v1/applications/?skip=0&limit=100"),
+      fetchJson<CitizenshipApplicationList>(
+        "/api/v1/applications/?skip=0&limit=100",
+      ),
   })
 
   const documentsQuery = useQuery({
@@ -323,7 +330,11 @@ function ApplicationsPage() {
   })
 
   const reviewDecisionMutation = useMutation({
-    mutationFn: (payload: { applicationId: string; action: ReviewAction; reason: string }) =>
+    mutationFn: (payload: {
+      applicationId: string
+      action: ReviewAction
+      reason: string
+    }) =>
       fetchJson<CitizenshipApplication>(
         `/api/v1/applications/${payload.applicationId}/review-decision`,
         {
@@ -357,7 +368,9 @@ function ApplicationsPage() {
     const rows = applicationsQuery.data?.data || []
     return [...rows].sort((left, right) => {
       const leftDate = left.created_at ? new Date(left.created_at).getTime() : 0
-      const rightDate = right.created_at ? new Date(right.created_at).getTime() : 0
+      const rightDate = right.created_at
+        ? new Date(right.created_at).getTime()
+        : 0
       return rightDate - leftDate
     })
   }, [applicationsQuery.data?.data])
@@ -425,35 +438,48 @@ function ApplicationsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {reviewQueueMetricsQuery.isLoading && (
-              <p className="text-sm text-muted-foreground">Loading queue metrics…</p>
+              <p className="text-sm text-muted-foreground">
+                Loading queue metrics…
+              </p>
             )}
-            {!reviewQueueMetricsQuery.isLoading && reviewQueueMetricsQuery.data && (
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="bg-muted/30 border-border/60 rounded-md border p-3">
-                  <p className="text-xs text-muted-foreground">Pending Manual</p>
-                  <p className="text-xl font-semibold">
-                    {reviewQueueMetricsQuery.data.pending_manual_count}
-                  </p>
+            {!reviewQueueMetricsQuery.isLoading &&
+              reviewQueueMetricsQuery.data && (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="bg-muted/30 border-border/60 rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">
+                      Pending Manual
+                    </p>
+                    <p className="text-xl font-semibold">
+                      {reviewQueueMetricsQuery.data.pending_manual_count}
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 border-border/60 rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">Overdue SLA</p>
+                    <p className="text-xl font-semibold text-destructive">
+                      {reviewQueueMetricsQuery.data.overdue_count}
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 border-border/60 rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">
+                      Backlog Clearance
+                    </p>
+                    <p className="text-xl font-semibold">
+                      {
+                        reviewQueueMetricsQuery.data
+                          .estimated_days_to_clear_backlog
+                      }{" "}
+                      days
+                    </p>
+                  </div>
                 </div>
-                <div className="bg-muted/30 border-border/60 rounded-md border p-3">
-                  <p className="text-xs text-muted-foreground">Overdue SLA</p>
-                  <p className="text-xl font-semibold text-destructive">
-                    {reviewQueueMetricsQuery.data.overdue_count}
-                  </p>
-                </div>
-                <div className="bg-muted/30 border-border/60 rounded-md border p-3">
-                  <p className="text-xs text-muted-foreground">Backlog Clearance</p>
-                  <p className="text-xl font-semibold">
-                    {reviewQueueMetricsQuery.data.estimated_days_to_clear_backlog} days
-                  </p>
-                </div>
-              </div>
-            )}
+              )}
 
             <div className="space-y-3">
               <p className="text-sm font-medium">Top Priority Queue</p>
               {reviewQueueQuery.isLoading && (
-                <p className="text-sm text-muted-foreground">Loading priority queue…</p>
+                <p className="text-sm text-muted-foreground">
+                  Loading priority queue…
+                </p>
               )}
               {!reviewQueueQuery.isLoading &&
                 (reviewQueueQuery.data?.data.length || 0) === 0 && (
@@ -469,14 +495,19 @@ function ApplicationsPage() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{item.applicant_full_name}</p>
                     <div className="flex items-center gap-2">
-                      <Badge variant={item.is_overdue ? "destructive" : "outline"}>
+                      <Badge
+                        variant={item.is_overdue ? "destructive" : "outline"}
+                      >
                         {item.is_overdue ? "SLA overdue" : "SLA active"}
                       </Badge>
-                      <Badge variant="secondary">Priority {item.priority_score}</Badge>
+                      <Badge variant="secondary">
+                        Priority {item.priority_score}
+                      </Badge>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {item.applicant_nationality} · {item.status.replace(/_/g, " ")} · Risk {item.risk_level}
+                    {item.applicant_nationality} ·{" "}
+                    {item.status.replace(/_/g, " ")} · Risk {item.risk_level}
                   </p>
                 </div>
               ))}
@@ -577,7 +608,8 @@ function ApplicationsPage() {
               <option value="">Select application</option>
               {sortedApplications.map((application) => (
                 <option key={application.id} value={application.id}>
-                  {application.applicant_full_name} · {application.applicant_nationality}
+                  {application.applicant_full_name} ·{" "}
+                  {application.applicant_nationality}
                 </option>
               ))}
             </select>
@@ -649,7 +681,9 @@ function ApplicationsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {applicationsQuery.isLoading && (
-            <p className="text-sm text-muted-foreground">Loading applications...</p>
+            <p className="text-sm text-muted-foreground">
+              Loading applications...
+            </p>
           )}
 
           {!applicationsQuery.isLoading && sortedApplications.length === 0 && (
@@ -665,7 +699,9 @@ function ApplicationsPage() {
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium">{application.applicant_full_name}</p>
+                  <p className="font-medium">
+                    {application.applicant_full_name}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {application.applicant_nationality}
                   </p>
@@ -695,7 +731,9 @@ function ApplicationsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {documentsQuery.isLoading && (
-              <p className="text-sm text-muted-foreground">Loading documents...</p>
+              <p className="text-sm text-muted-foreground">
+                Loading documents...
+              </p>
             )}
             {!documentsQuery.isLoading &&
               (documentsQuery.data?.data?.length || 0) === 0 && (
@@ -714,7 +752,11 @@ function ApplicationsPage() {
                     {document.document_type}
                   </p>
                 </div>
-                <Badge variant={document.status === "failed" ? "destructive" : "outline"}>
+                <Badge
+                  variant={
+                    document.status === "failed" ? "destructive" : "outline"
+                  }
+                >
                   {document.status}
                 </Badge>
               </div>
@@ -782,7 +824,7 @@ function ApplicationsPage() {
                         {rule.rationale}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Score: {(rule.score * 100).toFixed(0)}% · Weight: {" "}
+                        Score: {(rule.score * 100).toFixed(0)}% · Weight:{" "}
                         {(rule.weight * 100).toFixed(0)}%
                       </p>
                     </div>
@@ -799,7 +841,8 @@ function ApplicationsPage() {
           <CardHeader>
             <CardTitle>Caseworker Decision</CardTitle>
             <CardDescription>
-              Final action requires a mandatory reason and is written to the immutable audit trail.
+              Final action requires a mandatory reason and is written to the
+              immutable audit trail.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -850,7 +893,9 @@ function ApplicationsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {auditTrailQuery.isLoading && (
-              <p className="text-sm text-muted-foreground">Loading audit trail…</p>
+              <p className="text-sm text-muted-foreground">
+                Loading audit trail…
+              </p>
             )}
             {!auditTrailQuery.isLoading &&
               (auditTrailQuery.data?.events.length || 0) === 0 && (
@@ -864,7 +909,9 @@ function ApplicationsPage() {
                 className="bg-muted/20 border-border/60 rounded-md border p-3 space-y-1"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium">{event.action.replace(/_/g, " ")}</p>
+                  <p className="font-medium">
+                    {event.action.replace(/_/g, " ")}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {event.created_at
                       ? new Date(event.created_at).toLocaleString()
@@ -872,7 +919,9 @@ function ApplicationsPage() {
                   </p>
                 </div>
                 {event.reason && (
-                  <p className="text-sm text-muted-foreground">{event.reason}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {event.reason}
+                  </p>
                 )}
               </div>
             ))}

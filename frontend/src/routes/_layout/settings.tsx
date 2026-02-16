@@ -45,7 +45,10 @@ function UserSettings() {
         </p>
       </div>
 
-      <Tabs defaultValue="my-profile" className="bg-card border-border/60 rounded-xl border p-4 shadow-sm md:p-5">
+      <Tabs
+        defaultValue="my-profile"
+        className="bg-card border-border/60 rounded-xl border p-4 shadow-sm md:p-5"
+      >
         <TabsList className="mb-4">
           {finalTabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>

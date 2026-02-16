@@ -168,10 +168,10 @@ Expected output includes extracted passport numbers, nationalities, language ind
 ## Technology Stack
 
 - Backend: FastAPI, SQLModel, Pydantic, PostgreSQL
-- AI/ML: PyMuPDF (document intelligence), Pillow (image processing), pytesseract (OCR), regex NLP (entity extraction)
+- AI/ML: PyMuPDF (document intelligence), Pillow (image processing), pytesseract + Tesseract OCR (scanned documents), spaCy `nb_core_news_sm` (Norwegian NER), regex NLP (domain-specific entity extraction)
 - Frontend: React, TypeScript, TanStack Router/Query, Tailwind CSS, shadcn/ui
 - Infrastructure: Docker Compose, Traefik, JWT authentication
-- Quality: Pytest backend tests (including OCR/NLP unit tests) and Playwright end-to-end tests
+- Quality: Pytest backend tests (including OCR/NLP unit tests) and Vitest frontend unit tests
 
 ## Quick Start (Docker)
 
@@ -190,9 +190,10 @@ Then open:
 
 ### Prerequisites
 
-- [Python 3.10+](https://www.python.org/) with [uv](https://docs.astral.sh/uv/) package manager
+- [Python 3.13+](https://www.python.org/) with [uv](https://docs.astral.sh/uv/) package manager (3.13 required for spaCy compatibility)
 - [Bun](https://bun.sh/) (frontend package manager and runtime)
 - [Docker](https://www.docker.com/) (for PostgreSQL)
+- [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki) (for scanned document / image OCR)
 
 ### 1. Start the database
 
@@ -209,6 +210,30 @@ uv run alembic upgrade head         # run database migrations
 uv run python -m app.initial_data   # seed superuser (first time)
 uv run fastapi dev app/main.py      # dev server → http://localhost:8000
 ```
+
+### 2b. Install AI/ML dependencies (first time)
+
+```bash
+# Install Tesseract OCR (Windows — choose one):
+winget install UB-Mannheim.TesseractOCR
+# or: choco install tesseract -y  (requires admin)
+# Linux: sudo apt install tesseract-ocr tesseract-ocr-nor
+# macOS: brew install tesseract tesseract-lang
+
+# Set Tesseract path in .env (Windows example — adjust to your install location):
+# TESSERACT_CMD=C:\Users\<you>\AppData\Local\Programs\Tesseract-OCR\tesseract.exe
+
+# Install spaCy Norwegian language model:
+uv pip install https://github.com/explosion/spacy-models/releases/download/nb_core_news_sm-3.8.0/nb_core_news_sm-3.8.0-py3-none-any.whl
+
+# Verify both work:
+uv run python -c "import pytesseract; print(pytesseract.get_tesseract_version())"
+uv run python -c "import spacy; nlp = spacy.load('nb_core_news_sm'); print('spaCy OK')"
+```
+
+> **Note:** Both Tesseract and spaCy are optional. The system degrades gracefully:
+> - Without Tesseract: digital PDFs still work via PyMuPDF, but scanned/image docs return empty text
+> - Without spaCy: regex-based NLP handles all entity extraction (dates, passport numbers, keywords, etc.)
 
 API docs available at http://localhost:8000/docs (Swagger UI) and http://localhost:8000/redoc.
 
@@ -232,7 +257,7 @@ cd backend && uv run pytest
 # Frontend unit tests
 cd frontend && bun run test:unit
 
-# Frontend E2E tests (requires running stack)
+# Frontend unit tests
 cd frontend && bun run test
 ```
 

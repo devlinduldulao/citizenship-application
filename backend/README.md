@@ -15,9 +15,28 @@ This backend provides the API and decisioning engine for the citizenship manual-
 
 The backend contains a three-stage document intelligence pipeline:
 
-1. **OCR extraction** (`app/services/ocr.py`) — PyMuPDF extracts text from digital PDFs; Pillow + pytesseract handles scanned documents and images
-2. **NLP entity extraction** (`app/services/nlp.py`) — regex patterns tuned for Norwegian citizenship documents extract dates, passport numbers, nationalities, names, language/residency indicators, and citizenship keywords
+1. **OCR extraction** (`app/services/ocr.py`) — PyMuPDF extracts text from digital PDFs; Pillow + Tesseract OCR handles scanned documents and images
+2. **NLP entity extraction** (`app/services/nlp.py`) — spaCy `nb_core_news_sm` (Norwegian NER model) for person/location/date/org recognition, plus regex patterns tuned for citizenship documents (passport numbers, fødselsnummer, language indicators, residency keywords)
 3. **Rule engine** (`app/api/routes/applications.py`) — 7 weighted rules combine document-type signals with NLP-extracted evidence for explainable scoring
+
+### AI/ML setup (first time)
+
+```bash
+# Install Tesseract OCR binary:
+winget install UB-Mannheim.TesseractOCR       # Windows
+# sudo apt install tesseract-ocr tesseract-ocr-nor  # Linux
+# brew install tesseract tesseract-lang              # macOS
+
+# Set TESSERACT_CMD in root .env to the binary path
+
+# Install spaCy Norwegian model:
+uv pip install https://github.com/explosion/spacy-models/releases/download/nb_core_news_sm-3.8.0/nb_core_news_sm-3.8.0-py3-none-any.whl
+
+# Verify:
+uv run python -c "import spacy; nlp = spacy.load('nb_core_news_sm'); doc = nlp('Ahmed Hassan fra Somalia'); print([(e.text, e.label_) for e in doc.ents])"
+```
+
+Both are optional — the system degrades gracefully to PyMuPDF (digital PDFs) and regex-only NLP.
 
 ## Implemented API domains
 

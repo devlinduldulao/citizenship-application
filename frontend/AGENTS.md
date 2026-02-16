@@ -20,7 +20,7 @@
 | Forms          | React Hook Form + Zod               | 7.x + 4.x      |
 | Toasts         | Sonner                              | 2.x            |
 | Theming        | Custom ThemeProvider (dark default) | —              |
-| Testing        | Playwright (E2E)                    | 1.x            |
+| Testing        | Vitest (unit)                       | 4.x            |
 | Linting        | Biome                               | 2.x            |
 | Package Mgr    | Bun                                 | Latest          |
 
@@ -34,8 +34,8 @@ bun run dev                          # Dev server on http://localhost:5173
 bun run build                        # Production build (tsc + vite build)
 bun run preview                      # Preview production build
 bun run lint                         # Biome lint + format (auto-fix)
-bun run test                         # Playwright E2E tests
-bun run test:ui                      # Playwright tests with UI
+bun run test                         # Vitest unit tests
+bun run test:watch                   # Vitest tests in watch mode
 bun run generate-client              # Regenerate API client from OpenAPI spec
 ```
 
@@ -49,7 +49,6 @@ frontend/
 ├── biome.json                         # Biome linter/formatter config
 ├── components.json                    # shadcn/ui config (new-york style, rsc: false)
 ├── openapi-ts.config.ts               # API client generation config
-├── playwright.config.ts               # E2E test configuration
 ├── index.html                         # SPA entry point
 ├── src/
 │   ├── main.tsx                       # App bootstrap: QueryClient, Router, ThemeProvider, Toaster
@@ -92,16 +91,8 @@ frontend/
 │   │   └── useMobile.ts              # Mobile breakpoint detection
 │   └── lib/
 │       └── utils.ts                   # cn() utility (clsx + tailwind-merge)
-├── tests/                             # Playwright E2E tests
-│   ├── config.ts                      # Test config (URLs, credentials)
-│   ├── auth.setup.ts                  # Auth setup for tests
-│   ├── admin.spec.ts
-│   ├── items.spec.ts
-│   ├── login.spec.ts
-│   ├── sign-up.spec.ts
-│   ├── user-settings.spec.ts
-│   ├── reset-password.spec.ts
-│   └── utils/                         # Test helper utilities
+├── tests/                             # Vitest unit tests
+│   └── ...                            # Test files (*.test.ts/tsx)
 └── public/
     └── assets/                        # Static assets
 ```
@@ -287,21 +278,21 @@ Biome handles both linting and formatting:
 - Auto-organize imports
 - Excludes: `dist/`, `node_modules/`, `routeTree.gen.ts`, `src/client/`, `src/components/ui/`
 
-### Testing — Playwright E2E
+### Testing — Vitest Unit Tests
 
 ```typescript
-// ✅ Correct — Playwright tests against running stack
-import { test, expect } from "@playwright/test"
+// ✅ Correct — Vitest unit tests with Testing Library
+import { describe, it, expect } from "vitest"
+import { render, screen } from "@testing-library/react"
 
-test("should display applications page", async ({ page }) => {
-  await page.goto("/login")
-  // ... login flow
-  await page.goto("/applications")
-  await expect(page.getByText("Applications")).toBeVisible()
+describe("MyComponent", () => {
+  it("renders correctly", () => {
+    render(<MyComponent />)
+    expect(screen.getByText("Hello")).toBeInTheDocument()
+  })
 })
 
-// Tests require the full Docker stack to be running
-// Run: bun run test (or bun run test:ui for interactive mode)
+// Run: bun run test (single run) or bun run test:watch (watch mode)
 ```
 
 ## Common Tasks
