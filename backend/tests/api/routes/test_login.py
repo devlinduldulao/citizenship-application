@@ -189,3 +189,32 @@ def test_login_with_argon2_password_keeps_hash(client: TestClient, db: Session) 
 
     assert user.hashed_password == original_hash
     assert user.hashed_password.startswith("$argon2")
+
+
+def test_deleted_user_token_returns_invalid_credentials(
+    client: TestClient, db: Session
+) -> None:
+    email = random_email()
+    password = random_lower_string()
+
+    user_create = UserCreate(
+        email=email,
+        full_name="Token User",
+        password=password,
+        is_active=True,
+        is_superuser=False,
+    )
+    user = create_user(session=db, user_create=user_create)
+
+    login_data = {"username": email, "password": password}
+    token_resp = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
+    assert token_resp.status_code == 200
+    token = token_resp.json()["access_token"]
+
+    db.delete(user)
+    db.commit()
+
+    headers = {"Authorization": f"Bearer {token}"}
+    me_resp = client.get(f"{settings.API_V1_STR}/users/me", headers=headers)
+    assert me_resp.status_code == 401
+    assert me_resp.json() == {"detail": "Could not validate credentials"}

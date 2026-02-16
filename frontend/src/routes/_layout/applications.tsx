@@ -556,10 +556,11 @@ function ApplicationsPage() {
             <button
               type="button"
               key={application.id}
-              className={`w-full text-left rounded-md border p-4 flex flex-col gap-2 transition-colors cursor-pointer ${selectedApplicationId === application.id
+              className={`w-full text-left rounded-md border p-4 flex flex-col gap-2 transition-colors cursor-pointer ${
+                selectedApplicationId === application.id
                   ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                   : "bg-muted/20 border-border/60 hover:border-primary/40 hover:bg-muted/40"
-                }`}
+              }`}
               onClick={() => setSelectedApplicationId(application.id)}
             >
               <div className="flex items-center justify-between gap-3">
@@ -655,11 +656,11 @@ function ApplicationsPage() {
                     </p>
                     {evidenceRecommendationsQuery.data
                       .recommended_document_types.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          No additional high-impact document types suggested at
-                          this stage.
-                        </p>
-                      )}
+                      <p className="text-sm text-muted-foreground">
+                        No additional high-impact document types suggested at
+                        this stage.
+                      </p>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       {evidenceRecommendationsQuery.data.recommended_document_types.map(
                         (documentType) => (

@@ -1,5 +1,6 @@
 import sentry_sdk
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 
@@ -8,7 +9,8 @@ from app.core.config import settings
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
-    return f"{route.tags[0]}-{route.name}"
+    primary_tag = route.tags[0] if route.tags else "system"
+    return f"{primary_tag}-{route.name}"
 
 
 if settings.SENTRY_DSN and settings.ENVIRONMENT != "local":
@@ -36,3 +38,33 @@ if settings.all_cors_origins:
     )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "message": "Norwegian Citizenship Automation API",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "openapi": f"{settings.API_V1_STR}/openapi.json",
+    }
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/openapi.json", include_in_schema=False)
+def openapi_compat() -> RedirectResponse:
+    return RedirectResponse(url=f"{settings.API_V1_STR}/openapi.json")
+
+
+@app.get(f"{settings.API_V1_STR}/docs", include_in_schema=False)
+def docs_compat() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
+
+
+@app.get(f"{settings.API_V1_STR}/redoc", include_in_schema=False)
+def redoc_compat() -> RedirectResponse:
+    return RedirectResponse(url="/redoc")

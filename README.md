@@ -23,6 +23,17 @@ This MVP sits **on top of** UDI/Politi's existing automated pipeline. It targets
 
 The intended audience is **UDI/Politi operations teams** — specifically the reviewers, team leads, and managers who handle the manual backlog. The goal is not to replace their existing automation, but to give them tools to clear the growing pile of flagged cases faster and more consistently.
 
+## Documentation Map
+
+- [Root README](./README.md): architecture overview, setup, and runtime workflow
+- [Backend README](./backend/README.md): API domains, backend workflow, AI/OCR/NLP services
+- [Frontend README](./frontend/README.md): UI workflow, generated client usage, API call guard
+- [Development Guide](./development.md): environment and local development details
+- [Deployment Guide](./deployment.md): deployment and operations guidance
+- [Roadmap](./ROADMAP.md): phased delivery plan for product + AI evolution
+- [Immigrant User Guide](./IMMIGRANT_USER_GUIDE.md): step-by-step applicant journey
+- [Reviewer Admin Guide](./REVIEWER_ADMIN_GUIDE.md): step-by-step UDI/Politi/admin workflow
+
 ## MVP scope (implemented)
 
 ### Phase 1 — Intake and processing pipeline
@@ -279,9 +290,6 @@ cd backend && uv run pytest tests/unit -v
 cd backend && uv run pytest
 
 # Frontend unit tests
-cd frontend && bun run test:unit
-
-# Frontend unit tests
 cd frontend && bun run test
 ```
 
@@ -304,6 +312,9 @@ cd backend && uv run ruff format .  # format
 
 # Frontend
 cd frontend && bun run lint         # Biome lint + format
+
+# Monorepo contract guard (generated frontend client usage)
+bun run verify:api-contract
 ```
 
 ### Development URLs
@@ -322,6 +333,8 @@ cd frontend && bun run lint         # Biome lint + format
 | User             | Email               | Password     |
 |------------------|---------------------|--------------|
 | Superuser/Admin  | admin@example.com   | changethis   |
+
+For demo UX, the login page at `http://localhost:5173/login` is prefilled with these credentials by default.
 
 > **Warning:** Rotate all `changethis` defaults in `.env` before any shared deployment.
 

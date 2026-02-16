@@ -47,6 +47,33 @@ Both are optional — the system degrades gracefully to PyMuPDF (digital PDFs) a
 - Caseworker actions + audit (`/applications/{id}/review-decision`, `/applications/{id}/audit-trail`)
 - Reviewer workload queue + SLA metrics (`/applications/queue/review`, `/applications/queue/metrics`)
 
+## AI-assist endpoints
+
+- `GET /api/v1/applications/{id}/case-explainer`
+	- Returns AI-assisted case memo fields (`summary`, `recommended_action`, `key_risks`, `missing_evidence`, `next_steps`).
+	- Uses optional LLM configuration with deterministic fallback when unavailable.
+- `GET /api/v1/applications/{id}/evidence-recommendations`
+	- Returns suggested `document_type` targets and rationale to improve decision confidence.
+	- Designed for reviewer support, not automatic final decisions.
+
+## Quick commands
+
+From `backend/`:
+
+```bash
+uv sync
+uv run alembic upgrade head
+uv run fastapi dev app/main.py
+uv run ruff check .
+uv run pytest
+uv run python scripts/smoke_ocr_nlp.py
+```
+
+For demo usage, the frontend login form at http://localhost:5173/login is prefilled with:
+
+- Email: `admin@example.com`
+- Password: `changethis`
+
 ## Queue & SLA operations
 
 These endpoints are superuser-only and are used to monitor and prioritize manual review workload.
@@ -220,3 +247,11 @@ Key backend paths:
 ## Email Templates
 
 Email templates live in `./backend/app/email-templates/`. Edit `.mjml` sources in `src/`, then export to HTML in `build/` using the VS Code MJML extension (`Ctrl+Shift+P` → `MJML: Export to HTML`).
+
+## Related Documentation
+
+- [Root README](../README.md)
+- [Frontend README](../frontend/README.md)
+- [Roadmap](../ROADMAP.md)
+- [Immigrant User Guide](../IMMIGRANT_USER_GUIDE.md)
+- [Reviewer Admin Guide](../REVIEWER_ADMIN_GUIDE.md)

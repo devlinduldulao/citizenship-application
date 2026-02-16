@@ -57,8 +57,8 @@ function Login() {
     mode: "onBlur",
     criteriaMode: "all",
     defaultValues: {
-      username: "",
-      password: "",
+      username: "admin@example.com",
+      password: "changethis",
     },
   })
 
@@ -83,6 +83,9 @@ function Login() {
             </h1>
             <p className="text-muted-foreground text-sm">
               Continue to your applications and review queue.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Demo account prefilled: admin@example.com / changethis
             </p>
           </div>
 

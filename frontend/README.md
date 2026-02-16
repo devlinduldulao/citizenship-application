@@ -13,6 +13,15 @@ Built with [Vite](https://vitejs.dev/), [React](https://reactjs.org/), [TypeScri
 - Audit trail timeline for accountability and traceability
 - Reviewer workload dashboard with queue and SLA metrics
 
+## AI-assisted reviewer workflow
+
+The Applications route includes AI-assisted support components:
+
+- **AI Case Explainer** — concise case memo from rules/documents/audit context.
+- **AI Evidence Recommendations** — targeted missing-document suggestions and next actions.
+
+These AI outputs are advisory and are always paired with human decision controls.
+
 ## Reviewer Ops Playbook
 
 On the `Applications` page, use this sequence for daily review operations:
@@ -35,6 +44,11 @@ bun run dev
 ```
 
 * Then open your browser at http://localhost:5173/.
+
+For demo usage, the login form is prefilled by default with:
+
+- Email: `admin@example.com`
+- Password: `changethis`
 
 After login, the main MVP workflow is on the `Applications` page.
 
@@ -87,6 +101,23 @@ bun run check:api-client
 
 Only generated client files in `src/client/` are allowed to contain direct HTTP implementation details.
 
+## Quality gates
+
+Run these checks before committing frontend changes:
+
+```bash
+bun run check:api-client
+bun run lint
+bun run test
+bun run build
+```
+
+From monorepo root, you can run:
+
+```bash
+bun run verify:api-contract
+```
+
 ## Code Structure
 
 The frontend code is structured as follows:
@@ -131,3 +162,11 @@ docker compose down -v
 To update the tests, navigate to the tests directory and modify the existing test files or add new ones as needed.
 
 For more information on writing and running Playwright tests, refer to the official [Playwright documentation](https://playwright.dev/docs/intro).
+
+## Related Documentation
+
+- [Root README](../README.md)
+- [Backend README](../backend/README.md)
+- [Roadmap](../ROADMAP.md)
+- [Immigrant User Guide](../IMMIGRANT_USER_GUIDE.md)
+- [Reviewer Admin Guide](../REVIEWER_ADMIN_GUIDE.md)
