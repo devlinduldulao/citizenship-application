@@ -42,6 +42,13 @@ Prioritize reviewer productivity and decision quality while preserving human con
 - Add prompt/version lineage in audit events for AI-generated outputs.
 - Add stronger access controls and governance workflows for model configuration changes.
 
+## Additional AI roadmap candidates (post-hackathon)
+
+- Retrieval-grounded reviewer copilot over policy text, prior decisions, and audit events.
+- Active-learning loop where reviewer corrections improve extraction quality over time.
+- Document tamper/anomaly detection (cross-file identity mismatch, suspicious edits, metadata inconsistencies).
+- Auto-generated draft decision letters with mandatory reviewer approval before release.
+
 ## Suggested implementation order
 
 1. Keep endpoint + SDK contract checks in CI (`verify:api-contract`).
