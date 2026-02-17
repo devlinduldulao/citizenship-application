@@ -194,11 +194,7 @@ function validateQueueProcessing(input: QueueValidationInput): ValidationResult 
 }
 
 function isQueueButtonDisabled(input: QueueValidationInput): boolean {
-  return (
-    !input.selectedApplicationId ||
-    input.isPending ||
-    !input.documentCount
-  )
+  return !input.selectedApplicationId || input.isPending || !input.documentCount
 }
 
 describe("Queue Processing validation", () => {
