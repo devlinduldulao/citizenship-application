@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { LoaderCircle, Upload } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 
 import {
   type ApplicationStatus,
@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { invalidateAndRefetchActiveQueryKeys } from "@/lib/query-cache"
 
 type ReviewAction = ReviewDecisionAction
 
@@ -71,6 +72,7 @@ function ApplicationsPage() {
   const [documentType, setDocumentType] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [reviewReason, setReviewReason] = useState("")
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const reviewQueueQuery = useQuery({
     queryKey: ["review-queue"],
@@ -138,15 +140,17 @@ function ApplicationsPage() {
   const createMutation = useMutation({
     mutationFn: (requestBody: CitizenshipApplicationCreate) =>
       ApplicationsService.createApplication({ requestBody }),
-    onSuccess: (application) => {
+    onSuccess: async (application) => {
       showSuccessToast("Application created successfully")
       setApplicantFullName("")
       setApplicantNationality("")
       setApplicationNotes("")
       setSelectedApplicationId(application.id)
-      queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
-      queryClient.invalidateQueries({ queryKey: ["review-queue"] })
-      queryClient.invalidateQueries({ queryKey: ["review-queue-metrics"] })
+      await invalidateAndRefetchActiveQueryKeys(queryClient, [
+        ["citizenship-applications"],
+        ["review-queue"],
+        ["review-queue-metrics"],
+      ])
     },
     onError: (error: Error) => showErrorToast(error.message),
   })
@@ -164,19 +168,18 @@ function ApplicationsPage() {
           file: payload.file,
         },
       }),
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
       showSuccessToast("Document uploaded")
       setDocumentType("")
       setSelectedFile(null)
-      queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
-      queryClient.invalidateQueries({ queryKey: ["review-queue"] })
-      queryClient.invalidateQueries({ queryKey: ["review-queue-metrics"] })
-      queryClient.invalidateQueries({
-        queryKey: ["application-documents", selectedApplicationId],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["application-breakdown", selectedApplicationId],
-      })
+      const applicationId = variables.applicationId
+      await invalidateAndRefetchActiveQueryKeys(queryClient, [
+        ["citizenship-applications"],
+        ["review-queue"],
+        ["review-queue-metrics"],
+        ["application-documents", applicationId],
+        ["application-breakdown", applicationId],
+      ])
     },
     onError: (error: Error) => showErrorToast(error.message),
   })
@@ -187,18 +190,14 @@ function ApplicationsPage() {
         applicationId,
         requestBody: { force_reprocess: false },
       }),
-    onSuccess: () => {
+    onSuccess: async (_data, applicationId) => {
       showSuccessToast("Processing queued")
-      queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
-      queryClient.invalidateQueries({
-        queryKey: ["application-documents", selectedApplicationId],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["application-breakdown", selectedApplicationId],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["application-audit-trail", selectedApplicationId],
-      })
+      await invalidateAndRefetchActiveQueryKeys(queryClient, [
+        ["citizenship-applications"],
+        ["application-documents", applicationId],
+        ["application-breakdown", applicationId],
+        ["application-audit-trail", applicationId],
+      ])
     },
     onError: (error: Error) => showErrorToast(error.message),
   })
@@ -216,18 +215,17 @@ function ApplicationsPage() {
           reason: payload.reason,
         },
       }),
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
       showSuccessToast("Caseworker decision saved")
       setReviewReason("")
-      queryClient.invalidateQueries({ queryKey: ["citizenship-applications"] })
-      queryClient.invalidateQueries({ queryKey: ["review-queue"] })
-      queryClient.invalidateQueries({ queryKey: ["review-queue-metrics"] })
-      queryClient.invalidateQueries({
-        queryKey: ["application-breakdown", selectedApplicationId],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["application-audit-trail", selectedApplicationId],
-      })
+      const applicationId = variables.applicationId
+      await invalidateAndRefetchActiveQueryKeys(queryClient, [
+        ["citizenship-applications"],
+        ["review-queue"],
+        ["review-queue-metrics"],
+        ["application-breakdown", applicationId],
+        ["application-audit-trail", applicationId],
+      ])
     },
     onError: (error: Error) => showErrorToast(error.message),
   })
@@ -270,11 +268,17 @@ function ApplicationsPage() {
       return
     }
 
+    const fileToUpload = selectedFile
     uploadMutation.mutate({
       applicationId: selectedApplicationId,
       documentType: documentType.trim(),
-      file: selectedFile,
+      file: fileToUpload,
     })
+
+    setSelectedFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
   }
 
   const submitReviewDecision = (action: ReviewAction) => {
@@ -502,6 +506,7 @@ function ApplicationsPage() {
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="document_file">File</Label>
             <Input
+              ref={fileInputRef}
               id="document_file"
               type="file"
               accept=".pdf,image/png,image/jpeg,image/webp"

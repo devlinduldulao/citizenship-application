@@ -17,6 +17,7 @@ import {
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { invalidateAndRefetchActiveQueryKeys } from "@/lib/query-cache"
 import { handleError } from "@/utils"
 
 interface DeleteItemProps {
@@ -42,8 +43,8 @@ const DeleteItem = ({ id, onSuccess }: DeleteItemProps) => {
       onSuccess()
     },
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries()
+    onSettled: async () => {
+      await invalidateAndRefetchActiveQueryKeys(queryClient, [["items"]])
     },
   })
 

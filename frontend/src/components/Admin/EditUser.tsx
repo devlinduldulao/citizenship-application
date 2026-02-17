@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
+import { invalidateAndRefetchActiveQueryKeys } from "@/lib/query-cache"
 import { handleError } from "@/utils"
 
 const formSchema = z
@@ -82,8 +83,8 @@ const EditUser = ({ user, onSuccess }: EditUserProps) => {
       onSuccess()
     },
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] })
+    onSettled: async () => {
+      await invalidateAndRefetchActiveQueryKeys(queryClient, [["users"]])
     },
   })
 

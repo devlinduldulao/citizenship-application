@@ -8,6 +8,10 @@ import {
   type UserRegister,
   UsersService,
 } from "@/client"
+import {
+  invalidateAndRefetchActiveQueryKeys,
+  invalidateQueryKeys,
+} from "@/lib/query-cache"
 import { handleError } from "@/utils"
 import useCustomToast from "./useCustomToast"
 
@@ -33,8 +37,8 @@ const useAuth = () => {
       navigate({ to: "/login" })
     },
     onError: handleError.bind(showErrorToast),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] })
+    onSettled: async () => {
+      await invalidateQueryKeys(queryClient, [["users"]])
     },
   })
 
@@ -47,7 +51,8 @@ const useAuth = () => {
 
   const loginMutation = useMutation({
     mutationFn: login,
-    onSuccess: () => {
+    onSuccess: async () => {
+      await invalidateAndRefetchActiveQueryKeys(queryClient, [["currentUser"]])
       navigate({ to: "/" })
     },
     onError: handleError.bind(showErrorToast),
@@ -55,6 +60,7 @@ const useAuth = () => {
 
   const logout = () => {
     localStorage.removeItem("access_token")
+    queryClient.clear()
     navigate({ to: "/login" })
   }
 

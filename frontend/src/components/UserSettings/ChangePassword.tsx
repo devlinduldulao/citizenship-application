@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
@@ -15,6 +15,7 @@ import {
 import { LoadingButton } from "@/components/ui/loading-button"
 import { PasswordInput } from "@/components/ui/password-input"
 import useCustomToast from "@/hooks/useCustomToast"
+import { invalidateQueryKeys } from "@/lib/query-cache"
 import { handleError } from "@/utils"
 
 const formSchema = z
@@ -39,6 +40,7 @@ const formSchema = z
 type FormData = z.infer<typeof formSchema>
 
 const ChangePassword = () => {
+  const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -59,6 +61,9 @@ const ChangePassword = () => {
       form.reset()
     },
     onError: handleError.bind(showErrorToast),
+    onSettled: async () => {
+      await invalidateQueryKeys(queryClient, [["currentUser"]])
+    },
   })
 
   const onSubmit = async (data: FormData) => {

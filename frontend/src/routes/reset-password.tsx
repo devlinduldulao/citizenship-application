@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   createFileRoute,
   Link as RouterLink,
@@ -23,6 +23,7 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { PasswordInput } from "@/components/ui/password-input"
 import { isLoggedIn } from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { invalidateQueryKeys } from "@/lib/query-cache"
 import { handleError } from "@/utils"
 
 const searchSchema = z.object({
@@ -67,6 +68,7 @@ export const Route = createFileRoute("/reset-password")({
 })
 
 function ResetPassword() {
+  const queryClient = useQueryClient()
   const { token } = Route.useSearch()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const navigate = useNavigate()
@@ -90,6 +92,9 @@ function ResetPassword() {
       navigate({ to: "/login" })
     },
     onError: handleError.bind(showErrorToast),
+    onSettled: async () => {
+      await invalidateQueryKeys(queryClient, [["currentUser"]])
+    },
   })
 
   const onSubmit = (data: FormData) => {
