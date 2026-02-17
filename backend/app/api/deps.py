@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from contextlib import suppress
 from typing import Annotated
 
 import jwt
@@ -6,6 +7,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
+from sqlalchemy import exc as sa_exc
 from sqlmodel import Session
 
 from app.core import security
@@ -19,8 +21,12 @@ reusable_oauth2 = OAuth2PasswordBearer(
 
 
 def get_db() -> Generator[Session, None, None]:
-    with Session(engine) as session:
+    session = Session(engine)
+    try:
         yield session
+    finally:
+        with suppress(sa_exc.IllegalStateChangeError):
+            session.close()
 
 
 SessionDep = Annotated[Session, Depends(get_db)]

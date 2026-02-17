@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = ""
+    DB_CONNECT_TIMEOUT_SECONDS: int = 5
 
     @computed_field  # type: ignore[prop-decorator]
     @property
