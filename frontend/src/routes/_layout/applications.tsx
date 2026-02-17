@@ -26,6 +26,20 @@ import useCustomToast from "@/hooks/useCustomToast"
 
 type ReviewAction = ReviewDecisionAction
 
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: "passport", label: "Passport" },
+  { value: "id_card", label: "ID Card" },
+  { value: "residence_permit", label: "Residence Permit" },
+  { value: "residence_proof", label: "Residence Proof" },
+  { value: "tax_statement", label: "Tax Statement" },
+  { value: "language_certificate", label: "Language Certificate" },
+  { value: "norwegian_test", label: "Norwegian Test" },
+  { value: "education_certificate", label: "Education Certificate" },
+  { value: "police_clearance", label: "Police Clearance" },
+  { value: "photo", label: "Photo" },
+  { value: "document_scan", label: "Document Scan" },
+]
+
 const getStatusBadgeVariant = (status: ApplicationStatus) => {
   if (status === "approved") return "default"
   if (status === "rejected") return "destructive"
@@ -447,7 +461,7 @@ function ApplicationsPage() {
         <CardHeader>
           <CardTitle>Upload Requirement Documents</CardTitle>
           <CardDescription>
-            Supported formats: PDF, JPG, PNG, WEBP.
+            Supported formats: PDF, JPG, PNG, WEBP. Choose a document type from the list.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
@@ -470,14 +484,20 @@ function ApplicationsPage() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="document_type">Document type</Label>
-            <Input
+            <select
               id="document_type"
               name="document_type"
-              autoComplete="off"
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-9 w-full rounded-md border px-3 py-1 text-sm"
               value={documentType}
               onChange={(event) => setDocumentType(event.target.value)}
-              placeholder="e.g. passport"
-            />
+            >
+              <option value="">Select document type</option>
+              {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="document_file">File</Label>
