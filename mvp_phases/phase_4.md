@@ -1,6 +1,33 @@
 # Phase 4 (D+E) — Policy Intelligence + Governance & Production Hardening
 
-> **Status: NOT STARTED** — Mid-term phase. Expands deterministic rule coverage, adds versioned rule sets, simulation mode, model monitoring, audit lineage, and access controls.
+> **Status: Not Started** — Mid-term phase. Expands deterministic rule coverage, adds versioned rule sets, simulation mode, model monitoring, audit lineage, and access controls.
+
+Back to index: [Phase Overview](phase_1.md#cross-phase-index)
+
+## Leadership One-Page
+
+| Item | Summary |
+|------|---------|
+| Status | Not started |
+| Objective | Strengthen policy correctness, reproducibility, and AI governance controls |
+| Estimated effort | ~55–85 engineering hours |
+| Mandatory cost | $0 core; optional free observability stack |
+| Delivery strategy | 4 waves: D1 → D2 → E1 → E2 |
+| Primary risks | Scope size, migration complexity, role-permission regressions |
+| Risk control | Wave-based rollout, migration checkpoints, deny/allow API tests |
+| Recommendation | Go in waves (do not attempt as one large release) |
+
+### Leadership decision points
+
+- Approve D1 + E1 as priority tranche for highest governance value
+- Require rollback plan before rule-version activation in production
+- Enforce four-eyes approval for high-impact config changes
+
+### Presentation quick summary
+
+- Highest strategic value, but must be executed in waves to control complexity
+- Governance controls (lineage, approvals, role gates) are key compliance enablers
+- Prioritizing D1 + E1 provides best risk-reduction per engineering hour
 
 ---
 
@@ -22,6 +49,17 @@ Two complementary objectives combined into one phase:
 - Phase 1 (A) completed: eligibility rules and audit events working
 - Phase 2 (B) completed: copilot Q&A with citation payloads
 - Phase 3 (C) recommended but not strictly required
+
+## Recommended rollout sequence
+
+To reduce delivery risk, implement this phase in four waves:
+
+1. **D1:** Rule versioning + reproducibility (foundation)
+2. **D2:** Simulation mode + expanded rule packs
+3. **E1:** Monitoring + prompt/model lineage in audit metadata
+4. **E2:** Role-based governance + change approval workflow + admin UI
+
+This order keeps compliance-critical traceability ahead of UI-heavy governance features.
 
 ---
 
@@ -345,6 +383,14 @@ class ConfigChangeRequest(SQLModel, table=True):
 | Tests for all above | Both | 8–12 |
 | **Total** | | **~55–85 hours** |
 
+## Governance approval gates
+
+- [ ] Any rule-version activation requires documented rollback plan
+- [ ] Any model/prompt config change requires two-person approval (four-eyes)
+- [ ] Monitoring dashboards show baseline latency/error/fallback trends before rollout
+- [ ] Reproducibility check passes for a sampled set of historical decisions
+- [ ] Role-based permissions are validated by API tests for deny/allow scenarios
+
 ---
 
 ## Summary across all phases
@@ -358,3 +404,22 @@ class ConfigChangeRequest(SQLModel, table=True):
 | **Total remaining** | | | **~83–126 hours** |
 
 All phases have **$0 mandatory cost** — every external dependency is free and open-source. Paid LLM APIs are optional enhancements that enhance quality but are never required for functionality.
+
+### Execution note
+
+If schedule is constrained, prioritize **D1 + E1** first. Those two deliver the highest compliance and operational value per engineering hour.
+
+---
+
+## Approval Sign-Off
+
+| Field | Value |
+|------|-------|
+| Phase | 4 (D+E) — Policy Intelligence + Governance & Production Hardening |
+| Version | v1.0 |
+| Last Updated | 2026-02-19 |
+| Owner | |
+| Reviewer | |
+| Review Date | |
+| Decision | Pending / Approved / Changes Requested |
+| Notes | |

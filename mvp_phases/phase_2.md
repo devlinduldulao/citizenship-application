@@ -1,6 +1,33 @@
 # Phase 2 (B) — Reviewer Copilot
 
-> **Status: NOT STARTED** — Next phase. Adds contextual Q&A for reviewers, grounded in rules, documents, and audit trail, with strict citation payloads.
+> **Status: Not Started** — Next phase. Adds contextual Q&A for reviewers, grounded in rules, documents, and audit trail, with strict citation payloads.
+
+Back to index: [Phase Overview](phase_1.md#cross-phase-index)
+
+## Leadership One-Page
+
+| Item | Summary |
+|------|---------|
+| Status | Not started |
+| Objective | Deliver reviewer copilot Q&A with citation-first traceability |
+| Delivery approach | 2 slices: must-have first, LLM enhancements second |
+| Estimated effort | ~13–19 engineering hours |
+| Mandatory cost | $0 |
+| Primary risk | Citation quality/hallucination if LLM output is not validated |
+| Risk control | Deterministic fallback + citation source-id validation |
+| Recommendation | Go (low integration risk, high reviewer value) |
+
+### Leadership decision points
+
+- Approve Slice 1 as mandatory deliverable for next increment
+- Treat Slice 2 as optional enhancement if schedule remains
+- Require audit-event logging and fallback behavior before release
+
+### Presentation quick summary
+
+- Reviewer-facing value appears in the next increment with Slice 1
+- Delivery is low-risk because it reuses existing endpoints, models, and UI patterns
+- Strong fallback strategy prevents external API dependency risk
 
 ---
 
@@ -15,6 +42,21 @@ Give reviewers a copilot they can ask questions about any application — "Why t
 - No new tools, licenses, or SaaS subscriptions needed
 - No new pip/npm packages needed
 - No database migrations needed
+
+## Phase 2 MVP cut line (recommended)
+
+Ship in two slices so reviewers get value quickly:
+
+- **Slice 1 (must-have):** backend endpoint + deterministic fallback + citations + minimal frontend panel
+- **Slice 2 (enhancement):** optional LLM answers, richer chat UX polish, expanded test matrix
+
+If timeline is tight, merge after Slice 1 and defer Slice 2.
+
+## Dependencies and sequencing
+
+- **Hard dependency:** OpenAPI/SDK regeneration after backend endpoint merge
+- **Soft dependency:** Existing AI cards in applications UI (already present)
+- **No migration dependency:** No schema changes required for initial rollout
 
 ---
 
@@ -243,3 +285,26 @@ The new `CopilotAnswerPublic`, `CopilotCitationPublic`, and `CopilotQuestionRequ
 
 - **~13–19 hours** total for an engineer familiar with the codebase
 - No new dependencies, migrations, environment variables, or infrastructure changes
+
+## Go/No-Go acceptance criteria
+
+- [ ] Copilot endpoint returns cited responses for all 3 canonical questions
+- [ ] Fallback works when `AI_EXPLAINER_API_KEY` is unset
+- [ ] Citations never reference unknown `source_id` values
+- [ ] Frontend panel handles loading, error, and success states cleanly
+- [ ] Audit event `copilot_qa_asked` is persisted per request
+
+---
+
+## Approval Sign-Off
+
+| Field | Value |
+|------|-------|
+| Phase | 2 (B) — Reviewer Copilot |
+| Version | v1.0 |
+| Last Updated | 2026-02-19 |
+| Owner | |
+| Reviewer | |
+| Review Date | |
+| Decision | Pending / Approved / Changes Requested |
+| Notes | |

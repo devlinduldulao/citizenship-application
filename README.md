@@ -154,12 +154,6 @@ Every rule includes a human-readable rationale and full evidence payload so revi
 - **Evidence gap recommendations:** `evidence-recommendations` endpoint suggests high-impact missing document types and next actions.
 - **Human-in-the-loop controls:** AI outputs are advisory; final decisions remain caseworker-owned and auditable.
 
-## Hackathon & presentation resources
-
-Hackathon talking points, pitch scripts, 6-slide outline, judge Q&A, and fallback demo lines were moved to:
-
-- [`slides/HACKATHON_PRESENTATION.md`](slides/HACKATHON_PRESENTATION.md)
-
 ## AI expansion opportunities
 
 - Reviewer copilot Q&A grounded in rules, extracted evidence, and audit trail citations.

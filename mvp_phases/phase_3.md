@@ -1,6 +1,33 @@
 # Phase 3 (C) — Predictive Operations
 
-> **Status: NOT STARTED** — Short-term phase. Adds lightweight prediction models for triage, SLA risk, and confidence uplift — used only for ranking and queue optimization, never for automatic final decisions.
+> **Status: Not Started** — Short-term phase. Adds lightweight prediction models for triage, SLA risk, and confidence uplift — used only for ranking and queue optimization, never for automatic final decisions.
+
+Back to index: [Phase Overview](phase_1.md#cross-phase-index)
+
+## Leadership One-Page
+
+| Item | Summary |
+|------|---------|
+| Status | Not started |
+| Objective | Add predictive triage signals to improve queue prioritization |
+| Estimated effort | ~15–22 engineering hours |
+| Mandatory cost | $0 (free/open-source stack) |
+| Delivery strategy | Heuristic mode first, trained models only when data gate is met |
+| Primary risk | Low historical data causing weak trained-model quality |
+| Risk control | Data readiness gate + heuristic-only fallback |
+| Recommendation | Conditional Go (start now with heuristic path) |
+
+### Leadership decision points
+
+- Approve heuristic-first rollout regardless of dataset size
+- Gate trained-model rollout on minimum data threshold
+- Require advisory-only guarantees (no automatic decision mutation)
+
+### Presentation quick summary
+
+- Ships immediate value with heuristic predictors even before model training
+- Trained models are intentionally gated to avoid low-data quality issues
+- Operational safety is preserved by keeping outputs advisory-only
 
 ---
 
@@ -24,6 +51,16 @@ All predictions are advisory only — they inform queue ordering and triage, not
 
 - Phase 1 (A) completed: application data, rules, documents, audit events all in the database
 - Enough historical decisions to train on (recommended: 50+ completed applications for meaningful patterns; heuristic mode works with zero history)
+
+## Data readiness gate (before model training)
+
+Use this gate before green-lighting trained models:
+
+- **Minimum dataset:** 50+ completed applications with final decisions
+- **Preferred dataset:** 150+ completed applications with balanced outcomes
+- **If gate fails:** ship heuristic predictor only, keep model-training tasks deferred
+
+This keeps delivery predictable and avoids overfitting from sparse data.
 
 ---
 
@@ -235,3 +272,26 @@ ml = ["scikit-learn>=1.5"]
 - Heuristic predictor (ships immediately): ~6–8 hours
 - Trained model + training script: ~5–7 hours (can defer until data volume is sufficient)
 - Frontend queue enhancements: ~4–7 hours
+
+## Go/No-Go acceptance criteria
+
+- [ ] Queue API still meets current latency expectations after prediction fields are added
+- [ ] Prediction outputs are advisory-only and never mutate decision status
+- [ ] Heuristic mode works with zero trained model artifacts present
+- [ ] If trained mode is enabled, baseline quality metrics are documented (precision/recall)
+- [ ] Frontend can sort by prediction fields without breaking existing queue behavior
+
+---
+
+## Approval Sign-Off
+
+| Field | Value |
+|------|-------|
+| Phase | 3 (C) — Predictive Operations |
+| Version | v1.0 |
+| Last Updated | 2026-02-19 |
+| Owner | |
+| Reviewer | |
+| Review Date | |
+| Decision | Pending / Approved / Changes Requested |
+| Notes | |

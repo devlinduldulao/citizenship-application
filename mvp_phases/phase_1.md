@@ -1,6 +1,43 @@
 # Phase 1 (A) — Hackathon Ready ✅ Completed
 
-> **Status: DONE** — This phase covers the current MVP as shipped. All items below are implemented and working.
+> **Status: Completed** — This phase covers the current MVP as shipped. All items below are implemented and working.
+
+## Leadership One-Page
+
+| Item | Summary |
+|------|---------|
+| Status | Completed and currently shipping |
+| Business outcome | Manual-review throughput improved with explainability, queue prioritization, and auditable decisions |
+| Scope delivered | Intake + OCR/NLP + rule scoring + reviewer decisions + queue/SLA + 2 AI assist endpoints |
+| Operational confidence | High (existing tests, linting, and dockerized runtime) |
+| Estimated effort | N/A (already delivered) |
+| Mandatory cost | $0 |
+| Recommendation | Confirm baseline and proceed to Phase 2 (Reviewer Copilot) |
+
+### Leadership sign-off criteria
+
+- Baseline APIs respond correctly in dev
+- Frontend applications workflow shows explainability and AI panels
+- Audit trail and queue metrics are visible for superusers
+
+## Cross-Phase Index
+
+Use this as the quick navigation map for review:
+
+| Phase | Focus | Status | Effort | Link |
+|------|-------|--------|--------|------|
+| 1 (A) | Hackathon Ready baseline | Completed | — | [phase_1.md](phase_1.md) |
+| 2 (B) | Reviewer Copilot | Not started | ~13–19 hours | [phase_2.md](phase_2.md) |
+| 3 (C) | Predictive Operations | Not started | ~15–22 hours | [phase_3.md](phase_3.md) |
+| 4 (D+E) | Policy + Governance hardening | Not started | ~55–85 hours | [phase_4.md](phase_4.md) |
+
+Recommended reading order for decision-makers: Phase 1 → Phase 2 → Phase 3 → Phase 4.
+
+## Tech Lead Snapshot
+
+- **Source of truth:** This file + the implemented MVP sections in `README.md`
+- **Validation intent:** Treat this as a baseline inventory before approving Phase 2 work
+- **Decision gate:** Approve if all listed APIs and UI panels are reachable in local/dev environment
 
 ---
 
@@ -135,3 +172,26 @@ Phase A corresponds to the **MVP scope** described in the project README, coveri
 ## Summary
 
 Everything in this file is **already shipping**. Phases 2 through 4 build on top of this foundation.
+
+### Baseline verification checklist
+
+- [ ] `GET /api/v1/applications/{application_id}/case-explainer` returns 200 for a valid app
+- [ ] `GET /api/v1/applications/{application_id}/evidence-recommendations` returns 200 for a valid app
+- [ ] Applications UI shows both AI cards (Case Explainer + Evidence Recommendations)
+- [ ] Review queue endpoint and metrics endpoint both return data for superuser
+- [ ] Audit trail endpoint returns chronological event history
+
+---
+
+## Approval Sign-Off
+
+| Field | Value |
+|------|-------|
+| Phase | 1 (A) — Hackathon Ready |
+| Version | v1.0 |
+| Last Updated | 2026-02-19 |
+| Owner | |
+| Reviewer | |
+| Review Date | |
+| Decision | Pending / Approved / Changes Requested |
+| Notes | |
