@@ -68,7 +68,7 @@ const AddUser = () => {
       password: "",
       confirm_password: "",
       is_superuser: false,
-      is_active: false,
+      is_active: true,
     },
   })
 
