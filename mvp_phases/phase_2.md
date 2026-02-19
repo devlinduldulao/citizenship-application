@@ -35,6 +35,32 @@ Back to index: [Phase Overview](phase_1.md#cross-phase-index)
 
 Give reviewers a copilot they can ask questions about any application — "Why this risk level?", "Which rules failed?", "What document would help most?" — and get cited, traceable answers. Works fully without any paid LLM (deterministic fallback), with optional LLM enhancement using the existing `AI_EXPLAINER_*` config.
 
+## Priority real-world use case (must include)
+
+**Scenario:** Applicant has a new passport, old passport (historical 10-year evidence) is lost, and the case enters manual review with long wait and low transparency.
+
+### Product requirements for this scenario
+
+- Copilot must answer: **"Why is this case in manual review?"** with explicit reason codes and cited evidence.
+- Copilot must answer: **"What can substitute for a lost old passport?"** with policy-aligned alternatives (for example, police loss report, embassy confirmation, historical permit IDs, travel history records).
+- System must distinguish **"missing required document"** vs **"missing but explained with acceptable substitute"**.
+- Reviewer panel must show a short **next-action checklist** so caseworkers can resolve blockers faster.
+
+### Applicant transparency companion (recommended in same release)
+
+Add a lightweight applicant-facing status summary endpoint:
+
+`GET /api/v1/applications/{application_id}/review-status-summary`
+
+Response fields:
+
+- `manual_review_reason_codes: list[str]`
+- `missing_or_substitute_evidence: list[str]`
+- `latest_review_stage: str`
+- `updated_at: datetime`
+
+This does not expose sensitive internal notes; it only provides actionable, non-sensitive guidance so applicants know what is blocking progress.
+
 ## Cost
 
 - **$0 required** — deterministic fallback answers all three target questions without any LLM
@@ -245,6 +271,7 @@ The new `CopilotAnswerPublic`, `CopilotCitationPublic`, and `CopilotQuestionRequ
 | `test_citation_validation_downgrades_confidence` | All citations stripped → confidence = "low" |
 | `test_llm_invalid_json_falls_back` | Bad LLM output triggers fallback |
 | `test_llm_disabled_uses_fallback` | No API key → always deterministic |
+| `test_lost_old_passport_substitute_guidance` | Copilot returns substitute evidence guidance for lost historical passport scenario |
 
 ### Backend API tests (`backend/tests/api/routes/test_copilot_qa.py`)
 
@@ -254,6 +281,7 @@ The new `CopilotAnswerPublic`, `CopilotCitationPublic`, and `CopilotQuestionRequ
 | `test_copilot_qa_creates_audit_event` | Audit event logged with `action="copilot_qa_asked"` |
 | `test_copilot_qa_question_validation` | Too short/long questions return 422 |
 | `test_copilot_qa_unauthorized` | No auth → 401 |
+| `test_review_status_summary_masks_sensitive_notes` | Applicant summary endpoint returns actionable status without exposing internal reviewer-only notes |
 
 ### Frontend component tests (`frontend/src/tests/copilot-panel.test.tsx`)
 
@@ -293,6 +321,7 @@ The new `CopilotAnswerPublic`, `CopilotCitationPublic`, and `CopilotQuestionRequ
 - [ ] Citations never reference unknown `source_id` values
 - [ ] Frontend panel handles loading, error, and success states cleanly
 - [ ] Audit event `copilot_qa_asked` is persisted per request
+- [ ] Lost historical passport scenario returns substitute-evidence guidance and reason-coded explanation
 
 ---
 

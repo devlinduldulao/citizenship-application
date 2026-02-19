@@ -21,6 +21,8 @@ Prioritize reviewer productivity and decision quality while preserving human con
   - What document would improve confidence most?
 - Ground answers in rule evidence, OCR/NLP extraction, and audit timeline.
 - Include strict citation payloads for every copilot answer to keep outputs traceable.
+- Add applicant-facing manual-review status summaries with non-sensitive reason codes.
+- Provide guided reupload recommendations for missing or substitute evidence (for example, lost historical passport scenarios).
 
 ## Phase C — Predictive Operations (Short-Term)
 
@@ -41,6 +43,8 @@ Prioritize reviewer productivity and decision quality while preserving human con
 - Add model monitoring for drift, quality, and latency.
 - Add prompt/version lineage in audit events for AI-generated outputs.
 - Add stronger access controls and governance workflows for model configuration changes.
+- Add manual-review stagnation controls requiring periodic reason-code refresh and next-action updates.
+- Add transparent, non-sensitive applicant progress updates to reduce long-wait opacity.
 
 ## Additional AI roadmap candidates (post-hackathon)
 
@@ -53,6 +57,6 @@ Prioritize reviewer productivity and decision quality while preserving human con
 
 1. Keep endpoint + SDK contract checks in CI (`verify:api-contract`).
 2. Improve quality of evidence recommendations using reviewer feedback loops.
-3. Introduce copilot Q&A with citation-first responses.
+3. Introduce copilot Q&A with citation-first responses and applicant status summaries.
 4. Add triage prediction and queue optimization models.
 5. Expand policy/rule coverage and governance tooling.

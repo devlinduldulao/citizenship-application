@@ -84,6 +84,19 @@ Expand beyond the current 7 rules to cover more legal requirements:
 | **Citizenship renunciation** | Evidence of prior citizenship renunciation intent/process | 0.05–0.10 |
 | **Age/exemption** | Age-based exemptions (under 18, over 67), Nordic fast-track signals | 0.05–0.10 |
 
+### Exception-aware rule handling (required)
+
+Add explicit exception logic for common real-world gaps, including:
+
+- `historical_passport_missing_but_explained`
+- `historical_passport_missing_with_substitute_evidence`
+
+Expected behavior:
+
+- Do not hard-fail automatically when a legacy document is unavailable but credible substitutes exist.
+- Mark these as **manual verification required** with structured rationale instead of opaque failure.
+- Persist normalized reason codes so both reviewer tooling and applicant status summaries can report progress clearly.
+
 ### NLP enhancements for new rules
 
 Add regex patterns to `nlp.py` for:
@@ -307,6 +320,16 @@ class ConfigChangeRequest(SQLModel, table=True):
 
 **Database migration required:** `alembic revision --autogenerate -m "add governance tables"`
 
+### 7c. Manual-review stagnation controls (applicant transparency)
+
+Add governance rules for long-running manual-review cases:
+
+- If case remains in manual review beyond a configured threshold (for example, 60/90/120 days), require a refreshed reason code update.
+- Require next-action metadata on each stale-case touchpoint (`what is still needed`, `who owns next step`).
+- Expose non-sensitive progress summaries to applicants so they are not left in fully opaque wait states.
+
+This creates accountability loops without exposing confidential internal reviewer notes.
+
 ---
 
 ## Step 8 — Frontend governance pages
@@ -390,6 +413,8 @@ class ConfigChangeRequest(SQLModel, table=True):
 - [ ] Monitoring dashboards show baseline latency/error/fallback trends before rollout
 - [ ] Reproducibility check passes for a sampled set of historical decisions
 - [ ] Role-based permissions are validated by API tests for deny/allow scenarios
+- [ ] Exception-aware reason codes (including lost historical passport scenarios) are validated end-to-end
+- [ ] Stale manual-review governance checks are enforced and auditable
 
 ---
 
