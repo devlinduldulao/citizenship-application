@@ -227,128 +227,85 @@ Then open:
 
 ## Local Development
 
-### Prerequisites
+> **Full cross-platform setup guide (macOS, Ubuntu, Windows), `.env` reference, AI/ML configuration, Docker Compose details, and testing instructions are in [development.md](./development.md).**
 
-- [Python 3.13+](https://www.python.org/) with [uv](https://docs.astral.sh/uv/) package manager (3.13 required for spaCy compatibility)
-- [Bun](https://bun.sh/) (frontend package manager and runtime)
-- [Docker](https://www.docker.com/) (for PostgreSQL)
-- [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki) (for scanned document / image OCR)
-
-### 1. Start the database
+### Quick setup (all platforms)
 
 ```bash
+docker compose up -d --wait        # start everything in Docker
+```
+
+Frontend → http://localhost:5173 · API → http://localhost:8000 · Swagger UI → http://localhost:8000/docs
+
+### Native development (faster iteration, DB-only in Docker)
+
+```bash
+# 1. Start only the database
 docker compose up -d db --wait
-```
 
-### 2. Start the backend
-
-```bash
+# 2. Backend
 cd backend
-uv sync                             # install dependencies (first time)
-uv run alembic upgrade head         # run database migrations
+uv sync                             # install deps (first time)
+uv run alembic upgrade head         # apply migrations
 uv run python -m app.initial_data   # seed superuser (first time)
-uv run fastapi dev app/main.py      # dev server → http://localhost:8000
-```
+uv run fastapi dev app/main.py      # → http://localhost:8000
 
-### 2b. Install AI/ML dependencies (first time)
-
-```bash
-# Install Tesseract OCR (Windows — choose one):
-winget install UB-Mannheim.TesseractOCR
-# or: choco install tesseract -y  (requires admin)
-# Linux: sudo apt install tesseract-ocr tesseract-ocr-nor
-# macOS: brew install tesseract tesseract-lang
-
-# Set Tesseract path in .env (Windows example — adjust to your install location):
-# TESSERACT_CMD=C:\Users\<you>\AppData\Local\Programs\Tesseract-OCR\tesseract.exe
-
-# Install spaCy Norwegian language model:
-uv pip install https://github.com/explosion/spacy-models/releases/download/nb_core_news_sm-3.8.0/nb_core_news_sm-3.8.0-py3-none-any.whl
-
-# Verify both work:
-uv run python -c "import pytesseract; print(pytesseract.get_tesseract_version())"
-uv run python -c "import spacy; nlp = spacy.load('nb_core_news_sm'); print('spaCy OK')"
-
-# Verify using app config path (recommended on Windows when Tesseract is not on PATH):
-uv run python -c "from app.core.config import settings; import pytesseract; pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD or pytesseract.pytesseract.tesseract_cmd; print(pytesseract.get_tesseract_version())"
-
-# Optional: enable LLM-backed case explainer (OpenAI-compatible API)
-# AI_EXPLAINER_BASE_URL=https://api.openai.com/v1
-# AI_EXPLAINER_API_KEY=your_api_key
-# AI_EXPLAINER_MODEL=gpt-4.1-mini
-```
-
-> **Note:** Both Tesseract and spaCy are optional. The system degrades gracefully:
-> - Without Tesseract: digital PDFs still work via PyMuPDF, but scanned/image docs return empty text
-> - Without spaCy: regex-based NLP handles all entity extraction (dates, passport numbers, keywords, etc.)
-
-API docs available at http://localhost:8000/docs (Swagger UI) and http://localhost:8000/redoc.
-
-### 3. Start the frontend
-
-```bash
+# 3. Frontend (separate terminal)
 cd frontend
-bun install                         # install dependencies (first time)
-bun run dev                         # dev server → http://localhost:5173
+bun install                         # install deps (first time)
+bun run dev                         # → http://localhost:5173
 ```
 
-### 4. Run tests
+### AI/ML dependencies (Tesseract + spaCy)
+
+| Platform | Tesseract install | Auto-detected? |
+|---|---|---|
+| macOS | `brew install tesseract tesseract-lang` | ✅ yes |
+| Ubuntu | `sudo apt install tesseract-ocr tesseract-ocr-nor` | ✅ yes |
+| Windows | `winget install UB-Mannheim.TesseractOCR` | ✅ yes |
 
 ```bash
-# Backend unit tests (no DB required)
-cd backend && uv run pytest tests/unit -v
+# spaCy Norwegian model (all platforms)
+cd backend
+uv pip install https://github.com/explosion/spacy-models/releases/download/nb_core_news_sm-3.8.0/nb_core_news_sm-3.8.0-py3-none-any.whl
+```
 
-# Backend full test suite (requires running DB)
+Both are optional — the system degrades gracefully without them. See [development.md](./development.md#aiml-setup-tesseract--spacy) for details.
+
+### Run tests
+
+```bash
+# Backend (unit tests — no DB needed)
+cd backend && uv run pytest tests/unit tests/services -v
+
+# Backend (full suite — requires DB)
+docker compose up -d db --wait
 cd backend && uv run pytest
 
-# Frontend unit tests
-cd frontend && bun run test
-```
-
-### 5. Build for production
-
-```bash
-# Frontend production build
-cd frontend && bun run build        # outputs to frontend/dist/
-
-# Backend Docker image (must run from project root)
-docker build -t citizenship-backend -f backend/Dockerfile .
-```
-
-### 6. Lint and format
-
-```bash
-# Backend
-cd backend && uv run ruff check .   # lint
-cd backend && uv run ruff format .  # format
-
 # Frontend
-cd frontend && bun run lint         # Biome lint + format
-
-# Monorepo contract guard (generated frontend client usage)
-bun run verify:api-contract
+cd frontend && bun run test
 ```
 
 ### Development URLs
 
-| Service       | URL                       |
-|---------------|---------------------------|
-| Frontend      | http://localhost:5173      |
-| Backend API   | http://localhost:8000      |
-| Swagger UI    | http://localhost:8000/docs |
-| ReDoc         | http://localhost:8000/redoc|
-| Adminer (DB)  | http://localhost:8080      |
-| Mailcatcher   | http://localhost:1080      |
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
+| ReDoc | http://localhost:8000/redoc |
+| Adminer (DB) | http://localhost:8080 |
+| Mailcatcher | http://localhost:1080 |
 
 ### Default credentials
 
-| User             | Email               | Password     |
-|------------------|---------------------|--------------|
-| Superuser/Admin  | admin@example.com   | changethis   |
+| User | Email | Password |
+|---|---|---|
+| Superuser/Admin | admin@example.com | changethis |
 
-For demo UX, the login page at `http://localhost:5173/login` is prefilled with these credentials by default.
+For demo UX, the login page prefills these credentials automatically.
 
-> **Warning:** Rotate all `changethis` defaults in `.env` before any shared deployment.
+> **Warning:** Rotate all `changethis` defaults in `.env` before any shared or production deployment. See [development.md](./development.md#environment-file-env-reference) for the full `.env` reference.
 
 ### Login troubleshooting (spinner / CORS / devtools noise)
 
@@ -379,9 +336,9 @@ in Incognito mode (with extensions disabled) to verify app behavior.
 
 ### More details
 
+- Full cross-platform setup: [development.md](./development.md)
 - Backend setup and workflow: [backend/README.md](./backend/README.md)
 - Frontend setup and workflow: [frontend/README.md](./frontend/README.md)
-- Environment and stack details: [development.md](./development.md)
 
 ## Security Configuration
 
