@@ -139,6 +139,20 @@ _EXPIRY_CONTEXT_PATTERNS = [
     r"(?:gyldig\s+til|utløpsdato|utl(?:ø|o)psdato|utl(?:ø|o)per"
     r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
     r"\s*[:\-]?\s*(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
+    # Textual month formats often found in IDs (e.g. "04 JUL 2019", "04 july 2019")
+    r"(?:date\s+of\s+expir(?:y|ation)|expir(?:y|ation)\s+date|expir(?:es?|ed?)"
+    r"|valid\s+(?:until|through|to|till|thru)|validity\s+period\s+ends?)"
+    r"\s*[:\-]?\s*(\d{1,2}(?:[./_\-]|\s)+[A-Za-zÆØÅæøå]{3,10}(?:\s*/\s*[A-Za-zÆØÅæøå]{3,10})?(?:[./_\-]|\s)+\d{2,4})",
+    r"(?:gyldig\s+til|utløpsdato|utl(?:ø|o)psdato|utl(?:ø|o)per"
+    r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
+    r"\s*[:\-]?\s*(\d{1,2}(?:[./_\-]|\s)+[A-Za-zÆØÅæøå]{3,10}(?:\s*/\s*[A-Za-zÆØÅæøå]{3,10})?(?:[./_\-]|\s)+\d{2,4})",
+    # Underscore-separated OCR strings (e.g. "2019_07_04")
+    r"(?:date\s+of\s+expir(?:y|ation)|expir(?:y|ation)\s+date|expir(?:es?|ed?)"
+    r"|valid\s+(?:until|through|to|till|thru)|validity\s+period\s+ends?)"
+    r"\s*[:\-]?\s*(\d{4}[._\-/]\d{1,2}[._\-/]\d{1,2})",
+    r"(?:gyldig\s+til|utløpsdato|utl(?:ø|o)psdato|utl(?:ø|o)per"
+    r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
+    r"\s*[:\-]?\s*(\d{4}[._\-/]\d{1,2}[._\-/]\d{1,2})",
 ]
 
 # Residency / duration indicators
@@ -334,6 +348,80 @@ def parse_date_flexible(date_str: str) -> date | None:
     date_str = date_str.strip()
     if not date_str:
         return None
+
+    # Normalize OCR quirks and bilingual month fragments (e.g. "JUL / JUIL").
+    normalized = date_str
+    normalized = re.sub(r"\s+", " ", normalized)
+    normalized = normalized.replace("_", "-")
+    normalized = normalized.replace("–", "-").replace("—", "-")
+    normalized = re.sub(
+        r"\b([A-Za-zÆØÅæøå]{3,10})\s*/\s*[A-Za-zÆØÅæøå]{3,10}\b",
+        r"\1",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+
+    month_map = {
+        # English
+        "jan": "01",
+        "january": "01",
+        "feb": "02",
+        "february": "02",
+        "mar": "03",
+        "march": "03",
+        "apr": "04",
+        "april": "04",
+        "may": "05",
+        "jun": "06",
+        "june": "06",
+        "jul": "07",
+        "july": "07",
+        "aug": "08",
+        "august": "08",
+        "sep": "09",
+        "sept": "09",
+        "september": "09",
+        "oct": "10",
+        "october": "10",
+        "nov": "11",
+        "november": "11",
+        "dec": "12",
+        "december": "12",
+        # Norwegian
+        "januar": "01",
+        "februar": "02",
+        "mars": "03",
+        "mai": "05",
+        "juni": "06",
+        "juli": "07",
+        "okt": "10",
+        "oktober": "10",
+        "des": "12",
+        "desember": "12",
+    }
+    for month_name, month_number in month_map.items():
+        normalized = re.sub(
+            rf"\b{month_name}\b",
+            month_number,
+            normalized,
+            flags=re.IGNORECASE,
+        )
+
+    normalized = re.sub(r"[\s./]+", "-", normalized)
+    normalized = re.sub(r"-+", "-", normalized).strip("-")
+
+    # MRZ-style compact dates occasionally appear (YYMMDD).
+    if re.fullmatch(r"\d{6}", normalized):
+        yy = int(normalized[0:2])
+        mm = int(normalized[2:4])
+        dd = int(normalized[4:6])
+        try:
+            current_yy = datetime.now().year % 100
+            year = 2000 + yy if yy <= current_yy + 20 else 1900 + yy
+            return date(year, mm, dd)
+        except ValueError:
+            return None
+
     for fmt in (
         "%d.%m.%Y",
         "%d/%m/%Y",
@@ -344,9 +432,18 @@ def parse_date_flexible(date_str: str) -> date | None:
         "%d.%m.%y",
         "%d/%m/%y",
         "%d-%m-%y",
+        "%d-%m-%Y",
+        "%Y-%m-%d",
+        "%d-%m-%y",
     ):
         try:
             return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+
+    for fmt in ("%d-%m-%Y", "%Y-%m-%d", "%d-%m-%y"):
+        try:
+            return datetime.strptime(normalized, fmt).date()
         except ValueError:
             continue
     return None

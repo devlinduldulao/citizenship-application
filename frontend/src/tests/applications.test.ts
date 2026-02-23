@@ -197,6 +197,21 @@ function isQueueButtonDisabled(input: QueueValidationInput): boolean {
   return !input.selectedApplicationId || input.isPending || !input.documentCount
 }
 
+type QueuePayload = {
+  applicationId: string
+  force_reprocess: boolean
+}
+
+function buildQueuePayload(
+  applicationId: string,
+  forceReprocess: boolean,
+): QueuePayload {
+  return {
+    applicationId,
+    force_reprocess: forceReprocess,
+  }
+}
+
 describe("Queue Processing validation", () => {
   const validInput: QueueValidationInput = {
     selectedApplicationId: "some-uuid",
@@ -274,6 +289,22 @@ describe("Queue button disabled state", () => {
         isPending: false,
       }),
     ).toBe(false)
+  })
+})
+
+describe("Queue payload builder", () => {
+  it("builds normal queue payload with force_reprocess=false", () => {
+    expect(buildQueuePayload("app-123", false)).toEqual({
+      applicationId: "app-123",
+      force_reprocess: false,
+    })
+  })
+
+  it("builds force reprocess payload with force_reprocess=true", () => {
+    expect(buildQueuePayload("app-123", true)).toEqual({
+      applicationId: "app-123",
+      force_reprocess: true,
+    })
   })
 })
 

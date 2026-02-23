@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { LoaderCircle, Upload } from "lucide-react"
+import { CircleHelp, LoaderCircle, Upload } from "lucide-react"
 import { useMemo, useRef, useState } from "react"
 
 import {
@@ -21,6 +21,11 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { invalidateAndRefetchActiveQueryKeys } from "@/lib/query-cache"
@@ -48,6 +53,174 @@ const getStatusBadgeVariant = (status: ApplicationStatus) => {
   if (status === "review_ready") return "default"
   if (status === "processing" || status === "queued") return "secondary"
   return "outline"
+}
+
+const EXPIRY_CRITICAL_DOC_TYPES = new Set([
+  "passport",
+  "id_card",
+  "residence_permit",
+  "work_permit",
+])
+
+const parseDocumentDate = (value: string): Date | null => {
+  const raw = value.trim()
+  if (!raw) return null
+
+  let normalized = raw
+    .replace(/_/g, "-")
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  // Handle bilingual month tokens like "JUL / JUIL" by keeping first token.
+  normalized = normalized.replace(
+    /\b([A-Za-z]{3,10})\s*\/\s*[A-Za-z]{3,10}\b/i,
+    "$1",
+  )
+
+  const monthMap: Record<string, string> = {
+    jan: "01",
+    january: "01",
+    januar: "01",
+    feb: "02",
+    february: "02",
+    februar: "02",
+    mar: "03",
+    march: "03",
+    mars: "03",
+    apr: "04",
+    april: "04",
+    may: "05",
+    mai: "05",
+    jun: "06",
+    june: "06",
+    juni: "06",
+    jul: "07",
+    july: "07",
+    juli: "07",
+    aug: "08",
+    august: "08",
+    sep: "09",
+    sept: "09",
+    september: "09",
+    oct: "10",
+    october: "10",
+    okt: "10",
+    oktober: "10",
+    nov: "11",
+    november: "11",
+    dec: "12",
+    december: "12",
+    des: "12",
+    desember: "12",
+  }
+
+  for (const [monthName, monthNumber] of Object.entries(monthMap)) {
+    normalized = normalized.replace(
+      new RegExp(`\\b${monthName}\\b`, "gi"),
+      monthNumber,
+    )
+  }
+
+  normalized = normalized.replace(/[./\s]+/g, "-").replace(/-+/g, "-")
+
+  // YYMMDD (MRZ) fallback.
+  if (/^\d{6}$/.test(normalized)) {
+    const yy = Number.parseInt(normalized.slice(0, 2), 10)
+    const mm = Number.parseInt(normalized.slice(2, 4), 10)
+    const dd = Number.parseInt(normalized.slice(4, 6), 10)
+    const nowYY = new Date().getUTCFullYear() % 100
+    const year = yy <= nowYY + 20 ? 2000 + yy : 1900 + yy
+    const mrzDate = new Date(Date.UTC(year, mm - 1, dd))
+    return Number.isNaN(mrzDate.getTime()) ? null : mrzDate
+  }
+
+  const parts = normalized.split("-")
+  if (parts.length !== 3) return null
+
+  let year = 0
+  let month = 0
+  let day = 0
+
+  if (parts[0].length === 4) {
+    year = Number.parseInt(parts[0], 10)
+    month = Number.parseInt(parts[1], 10)
+    day = Number.parseInt(parts[2], 10)
+  } else {
+    day = Number.parseInt(parts[0], 10)
+    month = Number.parseInt(parts[1], 10)
+    year = Number.parseInt(parts[2], 10)
+    if (parts[2].length === 2) {
+      const nowYY = new Date().getUTCFullYear() % 100
+      year = year <= nowYY + 20 ? 2000 + year : 1900 + year
+    }
+  }
+
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const getExpiryBadge = (document: {
+  document_type: string
+  extracted_fields?: unknown
+}) => {
+  const docType = document.document_type.trim().toLowerCase()
+  if (!EXPIRY_CRITICAL_DOC_TYPES.has(docType)) return null
+
+  const extracted =
+    document.extracted_fields && typeof document.extracted_fields === "object"
+      ? (document.extracted_fields as Record<string, unknown>)
+      : null
+  const entities =
+    extracted?.entities && typeof extracted.entities === "object"
+      ? (extracted.entities as Record<string, unknown>)
+      : null
+  const expiryDates = Array.isArray(entities?.expiry_dates)
+    ? entities.expiry_dates.filter((item): item is string => typeof item === "string")
+    : []
+
+  if (expiryDates.length === 0) {
+    return {
+      label: "expiry unknown",
+      variant: "secondary" as const,
+      title: "No expiry date could be extracted from this document",
+    }
+  }
+
+  const todayUtc = new Date()
+  const today = Date.UTC(
+    todayUtc.getUTCFullYear(),
+    todayUtc.getUTCMonth(),
+    todayUtc.getUTCDate(),
+  )
+
+  let hasValid = false
+  for (const dateString of expiryDates) {
+    const parsed = parseDocumentDate(dateString)
+    if (!parsed) continue
+    if (parsed.getTime() < today) {
+      return {
+        label: "expired",
+        variant: "destructive" as const,
+        title: `Detected expiry date: ${dateString}`,
+      }
+    }
+    hasValid = true
+  }
+
+  if (hasValid) {
+    return {
+      label: "not expired",
+      variant: "default" as const,
+      title: "Detected document expiry date is in the future",
+    }
+  }
+
+  return {
+    label: "expiry unknown",
+    variant: "secondary" as const,
+    title: "Expiry date was extracted but could not be parsed",
+  }
 }
 
 export const Route = createFileRoute("/_layout/applications")({
@@ -185,13 +358,18 @@ function ApplicationsPage() {
   })
 
   const processMutation = useMutation({
-    mutationFn: (applicationId: string) =>
+    mutationFn: (payload: { applicationId: string; forceReprocess: boolean }) =>
       ApplicationsService.queueApplicationProcessing({
-        applicationId,
-        requestBody: { force_reprocess: false },
+        applicationId: payload.applicationId,
+        requestBody: { force_reprocess: payload.forceReprocess },
       }),
-    onSuccess: async (_data, applicationId) => {
-      showSuccessToast("Processing queued")
+    onSuccess: async (_data, variables) => {
+      showSuccessToast(
+        variables.forceReprocess
+          ? "Forced reprocessing queued"
+          : "Processing queued",
+      )
+      const applicationId = variables.applicationId
       await invalidateAndRefetchActiveQueryKeys(queryClient, [
         ["citizenship-applications"],
         ["application-documents", applicationId],
@@ -517,35 +695,94 @@ function ApplicationsPage() {
             />
           </div>
         </CardContent>
-        <CardFooter className="justify-between">
-          <Button
-            variant="outline"
-            disabled={
-              !selectedApplicationId ||
-              processMutation.isPending ||
-              !documentsQuery.data?.count
-            }
-            title={
-              !selectedApplicationId
-                ? "Select an application first"
-                : !documentsQuery.data?.count
-                  ? "Upload at least one document before processing"
-                  : undefined
-            }
-            onClick={() => {
-              if (!selectedApplicationId) return
-              processMutation.mutate(selectedApplicationId)
-            }}
-          >
-            {processMutation.isPending ? (
-              <>
-                <LoaderCircle className="animate-spin" />
-                Queuing
-              </>
-            ) : (
-              "Queue Processing"
-            )}
-          </Button>
+        <CardFooter className="justify-between gap-3 flex-wrap">
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2 flex-wrap items-center">
+            <Button
+              variant="outline"
+              disabled={
+                !selectedApplicationId ||
+                processMutation.isPending ||
+                !documentsQuery.data?.count
+              }
+              title={
+                !selectedApplicationId
+                  ? "Select an application first"
+                  : !documentsQuery.data?.count
+                    ? "Upload at least one document before processing"
+                    : undefined
+              }
+              onClick={() => {
+                if (!selectedApplicationId) return
+                processMutation.mutate({
+                  applicationId: selectedApplicationId,
+                  forceReprocess: false,
+                })
+              }}
+            >
+              {processMutation.isPending ? (
+                <>
+                  <LoaderCircle className="animate-spin" />
+                  Queuing
+                </>
+              ) : (
+                "Queue Processing"
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={
+                !selectedApplicationId ||
+                processMutation.isPending ||
+                !documentsQuery.data?.count
+              }
+              title={
+                !selectedApplicationId
+                  ? "Select an application first"
+                  : !documentsQuery.data?.count
+                    ? "Upload at least one document before processing"
+                    : "Re-runs OCR/NLP for all uploaded documents"
+              }
+              onClick={() => {
+                if (!selectedApplicationId) return
+                processMutation.mutate({
+                  applicationId: selectedApplicationId,
+                  forceReprocess: true,
+                })
+              }}
+            >
+              {processMutation.isPending ? (
+                <>
+                  <LoaderCircle className="animate-spin" />
+                  Requeuing
+                </>
+              ) : (
+                "Force Reprocess"
+              )}
+            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-muted-foreground"
+                  aria-label="What does Force Reprocess do?"
+                >
+                  <CircleHelp />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6}>
+                Re-runs OCR/NLP for all uploaded documents and refreshes expiry
+                detection when older scans or previous parser output may be stale.
+              </TooltipContent>
+            </Tooltip>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use <span className="font-medium text-foreground">Force Reprocess</span> after
+              uploading older scans or when you want OCR/NLP to re-check document expiry.
+            </p>
+          </div>
           <Button
             onClick={handleUpload}
             disabled={
@@ -650,26 +887,36 @@ function ApplicationsPage() {
                   No documents uploaded for this application yet.
                 </p>
               )}
-            {documentsQuery.data?.data.map((document) => (
-              <div
-                key={document.id}
-                className="bg-muted/20 border-border/60 rounded-md border p-3 flex items-center justify-between"
-              >
-                <div>
-                  <p className="font-medium">{document.original_filename}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {document.document_type}
-                  </p>
-                </div>
-                <Badge
-                  variant={
-                    document.status === "failed" ? "destructive" : "outline"
-                  }
+            {documentsQuery.data?.data.map((document) => {
+              const expiryBadge = getExpiryBadge(document)
+              return (
+                <div
+                  key={document.id}
+                  className="bg-muted/20 border-border/60 rounded-md border p-3 flex items-center justify-between"
                 >
-                  {document.status}
-                </Badge>
-              </div>
-            ))}
+                  <div>
+                    <p className="font-medium">{document.original_filename}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {document.document_type}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge
+                      variant={
+                        document.status === "failed" ? "destructive" : "outline"
+                      }
+                    >
+                      {document.status}
+                    </Badge>
+                    {expiryBadge && (
+                      <Badge variant={expiryBadge.variant} title={expiryBadge.title}>
+                        {expiryBadge.label}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </CardContent>
         </Card>
       )}

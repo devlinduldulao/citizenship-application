@@ -61,6 +61,15 @@ class TestGetRiskLevel:
 # get_recommendation
 # ---------------------------------------------------------------------------
 class TestGetRecommendation:
+    def test_expired_documents_override_all_other_paths(self) -> None:
+        result = get_recommendation(
+            confidence_score=0.95,
+            processed_documents=5,
+            failed_documents=0,
+            has_expired_critical_documents=True,
+        )
+        assert "expired" in result.lower()
+
     def test_failed_documents_override(self) -> None:
         result = get_recommendation(
             confidence_score=0.9, processed_documents=5, failed_documents=1
@@ -108,6 +117,15 @@ class TestGetRecommendation:
             confidence_score=0.5, processed_documents=0, failed_documents=2
         )
         assert "failed document" in result.lower()
+
+    def test_expired_documents_precedence_over_failed_documents(self) -> None:
+        result = get_recommendation(
+            confidence_score=0.95,
+            processed_documents=5,
+            failed_documents=2,
+            has_expired_critical_documents=True,
+        )
+        assert "expired" in result.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +448,7 @@ class TestEvaluateEligibilityRules:
     def test_empty_documents_list(self) -> None:
         app = _make_application()
         rules = evaluate_eligibility_rules(application=app, documents=[])
-        assert len(rules) == 6  # base rules always present (includes nlp_entity_richness)
+        assert len(rules) == 7  # base rules always present (includes nlp_entity_richness + document_not_expired)
         # All should fail or have zero scores
         identity_rule = next(r for r in rules if r.rule_code == "identity_document_present")
         assert identity_rule.passed is False
@@ -458,7 +476,7 @@ class TestEvaluateEligibilityRules:
         # nlp_entity_richness may not pass without real OCR text, exclude it
         doc_type_rules = [r for r in rules if r.rule_code != "nlp_entity_richness"]
         assert all(r.passed for r in doc_type_rules)
-        assert len(rules) == 7  # 6 base + 1 bonus (residency_duration_signal)
+        assert len(rules) == 8  # 7 base + 1 bonus (residency_duration_signal)
 
     def test_id_card_also_satisfies_identity(self) -> None:
         app = _make_application()
@@ -473,3 +491,129 @@ class TestEvaluateEligibilityRules:
         rules = evaluate_eligibility_rules(application=app, documents=docs)
         identity_rule = next(r for r in rules if r.rule_code == "identity_document_present")
         assert identity_rule.passed is True
+
+
+# ---------------------------------------------------------------------------
+# evaluate_eligibility_rules — document expiry checks
+# ---------------------------------------------------------------------------
+
+def _make_document_with_expiry(
+    application_id: uuid.UUID,
+    document_type: str,
+    expiry_date: str | None,
+    *,
+    status: str = DocumentStatus.PROCESSED.value,
+) -> ApplicationDocument:
+    """Build a document that carries per-document extracted expiry date entities."""
+    extracted: dict = {}
+    if expiry_date is not None:
+        extracted = {"entities": {"expiry_dates": [expiry_date]}}
+    return ApplicationDocument(
+        id=uuid.uuid4(),
+        application_id=application_id,
+        document_type=document_type,
+        original_filename=f"{document_type}.pdf",
+        mime_type="application/pdf",
+        file_size_bytes=1024,
+        storage_path=f"/tmp/{document_type}.pdf",
+        status=status,
+        extracted_fields=extracted,
+    )
+
+
+class TestDocumentExpiryRule:
+    def test_expired_passport_fails_rule(self) -> None:
+        app = _make_application()
+        docs = [_make_document_with_expiry(app.id, "passport", "01.01.2020")]
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        assert expiry_rule.passed is False
+        assert expiry_rule.score == 0.0
+        assert "01.01.2020" in expiry_rule.rationale
+
+    def test_valid_passport_passes_rule(self) -> None:
+        future = (datetime.now(timezone.utc).date() + timedelta(days=365 * 3)).strftime("%d.%m.%Y")
+        app = _make_application()
+        docs = [_make_document_with_expiry(app.id, "passport", future)]
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        assert expiry_rule.passed is True
+        assert expiry_rule.score == 1.0
+
+    def test_expired_residence_permit_fails_rule(self) -> None:
+        app = _make_application()
+        docs = [_make_document_with_expiry(app.id, "residence_permit", "15.06.2022")]
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        assert expiry_rule.passed is False
+        assert expiry_rule.score == 0.0
+        assert "residence_permit" in expiry_rule.rationale.lower()
+
+    def test_expired_id_card_fails_rule(self) -> None:
+        app = _make_application()
+        docs = [_make_document_with_expiry(app.id, "id_card", "2019-03-31")]
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        assert expiry_rule.passed is False
+        assert expiry_rule.score == 0.0
+
+    def test_expired_work_permit_fails_rule(self) -> None:
+        app = _make_application()
+        docs = [_make_document_with_expiry(app.id, "work_permit", "30.11.2023")]
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        assert expiry_rule.passed is False
+
+    def test_no_expiry_date_extracted_passes_with_partial_score(self) -> None:
+        """No expiry dates in extracted_fields — benefit of doubt, but score reduced."""
+        app = _make_application()
+        docs = [_make_document(app.id, "passport")]  # No extracted_fields
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        assert expiry_rule.passed is True
+        assert expiry_rule.score == 0.6
+
+    def test_non_expiry_critical_docs_not_checked(self) -> None:
+        """police_clearance, language_certificate etc. must not trigger expiry failures."""
+        app = _make_application()
+        docs = [
+            _make_document(app.id, "police_clearance"),
+            _make_document(app.id, "language_certificate"),
+            _make_document(app.id, "tax_statement"),
+        ]
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        # No expiry-critical docs — rule is N/A, passed with neutral score
+        assert expiry_rule.passed is True
+        assert expiry_rule.score == 0.5
+
+    def test_one_expired_among_valid_fails_whole_rule(self) -> None:
+        """A single expired critical document must fail the entire rule."""
+        future = (datetime.now(timezone.utc).date() + timedelta(days=365)).strftime("%d.%m.%Y")
+        app = _make_application()
+        docs = [
+            _make_document_with_expiry(app.id, "passport", future),  # valid
+            _make_document_with_expiry(app.id, "residence_permit", "01.01.2021"),  # expired
+        ]
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        assert expiry_rule.passed is False
+        assert expiry_rule.score == 0.0
+        assert "residence_permit" in expiry_rule.rationale.lower()
+
+    def test_expired_doc_evidence_captures_details(self) -> None:
+        app = _make_application()
+        docs = [_make_document_with_expiry(app.id, "passport", "15.03.2021")]
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        assert len(expiry_rule.evidence.get("expired_documents", [])) == 1
+        assert expiry_rule.evidence.get("valid_expiry_confirmed") == []
+
+    def test_valid_expiry_evidence_captured(self) -> None:
+        future = (datetime.now(timezone.utc).date() + timedelta(days=500)).strftime("%d.%m.%Y")
+        app = _make_application()
+        docs = [_make_document_with_expiry(app.id, "passport", future)]
+        rules = evaluate_eligibility_rules(application=app, documents=docs)
+        expiry_rule = next(r for r in rules if r.rule_code == "document_not_expired")
+        assert "passport" in expiry_rule.evidence.get("valid_expiry_confirmed", [])
+        assert expiry_rule.evidence.get("expired_documents") == []
