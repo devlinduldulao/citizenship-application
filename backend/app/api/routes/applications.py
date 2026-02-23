@@ -1,5 +1,5 @@
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +42,7 @@ from app.services.nlp import (
     ExtractedEntities,
     compute_document_nlp_score,
     extract_entities,
+    parse_date_flexible,
 )
 from app.services.ocr import extract_text
 
@@ -445,7 +446,22 @@ def process_application_documents(application_id: uuid.UUID) -> None:
         confidence_score = weighted_score_sum / total_weight if total_weight else 0
         passed_rules = sum(1 for rule in rules if rule.passed)
 
+        expiry_rule = next(
+            (rule for rule in rules if rule.rule_code == "document_not_expired"),
+            None,
+        )
+        has_expired_critical_documents = bool(
+            expiry_rule and (not expiry_rule.passed) and expiry_rule.score == 0.0
+        )
+
+        if has_expired_critical_documents:
+            # Hard guardrail: expired identity/residency documents cannot be low-risk.
+            confidence_score = min(confidence_score, 0.55)
+
         risk_level = get_risk_level(confidence_score=confidence_score)
+        if has_expired_critical_documents:
+            risk_level = "high"
+
         age_days = max(
             0,
             (get_datetime_utc() - (application.created_at or get_datetime_utc())).total_seconds()
@@ -461,6 +477,7 @@ def process_application_documents(application_id: uuid.UUID) -> None:
             confidence_score=confidence_score,
             processed_documents=processed_documents,
             failed_documents=failed_documents,
+            has_expired_critical_documents=has_expired_critical_documents,
         )
 
         application.status = ApplicationStatus.REVIEW_READY.value
@@ -489,6 +506,7 @@ def process_application_documents(application_id: uuid.UUID) -> None:
                 ),
                 "processed_documents": processed_documents,
                 "failed_documents": failed_documents,
+                "has_expired_critical_documents": has_expired_critical_documents,
             },
         )
         session.commit()
@@ -503,8 +521,14 @@ def get_risk_level(*, confidence_score: float) -> str:
 
 
 def get_recommendation(
-    *, confidence_score: float, processed_documents: int, failed_documents: int
+    *,
+    confidence_score: float,
+    processed_documents: int,
+    failed_documents: int,
+    has_expired_critical_documents: bool = False,
 ) -> str:
+    if has_expired_critical_documents:
+        return "Expired identity/residency document detected; request renewed valid documents"
     if failed_documents > 0:
         return "Manual follow-up required due to failed document parsing"
     if processed_documents == 0:
@@ -589,13 +613,83 @@ def evaluate_eligibility_rules(
     if nlp_has_language_signal and not has_language_document:
         language_score = 0.7  # NLP found language test indicators
 
+    # --- Document expiry validation ---
+    # Only these document types can expire and would disqualify an application.
+    _EXPIRY_CRITICAL_TYPES = frozenset({"passport", "id_card", "residence_permit", "work_permit"})
+
+    expired_doc_descriptions: list[str] = []
+    valid_expiry_doc_types: list[str] = []
+    unverifiable_doc_types: list[str] = []  # Critical docs where no expiry date was found
+
+    for _doc in documents:
+        _doc_type = _doc.document_type.strip().lower()
+        if _doc_type not in _EXPIRY_CRITICAL_TYPES:
+            continue
+        _doc_fields = _doc.extracted_fields if isinstance(_doc.extracted_fields, dict) else {}
+        _doc_entities = _doc_fields.get("entities", {}) if isinstance(_doc_fields, dict) else {}
+        _expiry_dates: list[str] = (
+            _doc_entities.get("expiry_dates", [])
+            if isinstance(_doc_entities, dict)
+            else []
+        )
+
+        if not _expiry_dates:
+            unverifiable_doc_types.append(_doc_type)
+            continue
+
+        _doc_expired = False
+        for _expiry_str in _expiry_dates:
+            _parsed = parse_date_flexible(_expiry_str)
+            if _parsed is None:
+                continue
+            if _parsed < date.today():
+                expired_doc_descriptions.append(f"{_doc_type} (expired {_expiry_str})")
+                _doc_expired = True
+                break
+        if not _doc_expired:
+            valid_expiry_doc_types.append(_doc_type)
+
+    _any_critical_expired = len(expired_doc_descriptions) > 0
+    expiry_rule_passed = not _any_critical_expired
+    if _any_critical_expired:
+        expiry_score = 0.0
+        expiry_rationale = (
+            "EXPIRED documents detected: "
+            + "; ".join(expired_doc_descriptions)
+            + ". Expired identity or residence documents must be renewed before "
+            "a citizenship application can be approved."
+        )
+    elif valid_expiry_doc_types:
+        expiry_score = 1.0
+        expiry_rationale = (
+            "Expiry dates confirmed valid for: "
+            + ", ".join(sorted(set(valid_expiry_doc_types)))
+            + (
+                f"; expiry date not found in: {', '.join(sorted(set(unverifiable_doc_types)))}"
+                " — manual verification recommended"
+                if unverifiable_doc_types
+                else ""
+            )
+        )
+    elif unverifiable_doc_types:
+        expiry_score = 0.6
+        expiry_rationale = (
+            "Expiry date not detected in: "
+            + ", ".join(sorted(set(unverifiable_doc_types)))
+            + ". Manual verification of document validity is required."
+        )
+    else:
+        # No expiry-critical documents uploaded — not applicable for this rule
+        expiry_score = 0.5
+        expiry_rationale = "No expiry-critical documents uploaded; not applicable."
+
     rule_payloads: list[dict[str, Any]] = [
         {
             "rule_code": "identity_document_present",
             "rule_name": "Identity document provided",
             "passed": has_identity_document or nlp_has_passport_number,
             "score": identity_score,
-            "weight": 0.20,
+            "weight": 0.16,
             "rationale": (
                 "Passport or national ID detected"
                 + ("; passport number extracted from text" if nlp_has_passport_number else "")
@@ -613,7 +707,7 @@ def evaluate_eligibility_rules(
             "rule_name": "Residency evidence provided",
             "passed": has_residency_document or nlp_has_residency_signal,
             "score": residency_score,
-            "weight": 0.18,
+            "weight": 0.15,
             "rationale": (
                 "Residency-related document detected"
                 + (
@@ -635,7 +729,7 @@ def evaluate_eligibility_rules(
             "rule_name": "Language or integration evidence",
             "passed": has_language_document or nlp_has_language_signal,
             "score": language_score,
-            "weight": 0.15,
+            "weight": 0.13,
             "rationale": (
                 "Language/integration certificate detected"
                 + (
@@ -656,7 +750,7 @@ def evaluate_eligibility_rules(
             "rule_name": "Document OCR/NLP extraction quality",
             "passed": ocr_quality_ratio >= 0.8,
             "score": round(ocr_quality_ratio, 2),
-            "weight": 0.17,
+            "weight": 0.14,
             "rationale": (
                 f"OCR processed {len(processed_documents)}/{len(documents)} documents"
                 + (f"; avg NLP entity score {avg_nlp_score}" if avg_nlp_score > 0 else "")
@@ -673,7 +767,7 @@ def evaluate_eligibility_rules(
             "rule_name": "Security screening evidence",
             "passed": has_police_document,
             "score": 1.0 if has_police_document else 0.4,
-            "weight": 0.15,
+            "weight": 0.13,
             "rationale": (
                 "Police clearance document detected"
                 if has_police_document
@@ -686,7 +780,7 @@ def evaluate_eligibility_rules(
             "rule_name": "NLP entity extraction richness",
             "passed": merged_entities.raw_entity_count >= 5,
             "score": min(1.0, merged_entities.raw_entity_count / 10),
-            "weight": 0.10,
+            "weight": 0.09,
             "rationale": (
                 f"NLP extracted {merged_entities.raw_entity_count} entities across "
                 f"{len(all_entities or [])} documents "
@@ -699,6 +793,19 @@ def evaluate_eligibility_rules(
                 "nationalities_found": merged_entities.nationalities[:5],
                 "keywords_found": merged_entities.keywords_found[:10],
                 "names_found": merged_entities.names[:3],
+            },
+        },
+        {
+            "rule_code": "document_not_expired",
+            "rule_name": "Document expiry validation",
+            "passed": expiry_rule_passed,
+            "score": expiry_score,
+            "weight": 0.15,
+            "rationale": expiry_rationale,
+            "evidence": {
+                "expired_documents": expired_doc_descriptions,
+                "valid_expiry_confirmed": sorted(set(valid_expiry_doc_types)),
+                "expiry_date_unverifiable": sorted(set(unverifiable_doc_types)),
             },
         },
     ]

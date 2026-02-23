@@ -97,11 +97,36 @@ def generate_evidence_recommendations(
                 recommended_document_types.append(document_type)
             rationale_by_document_type[document_type] = failed_rule.rationale
 
+    expired_docs_rule = failed_rules.get("document_not_expired")
+    if expired_docs_rule:
+        expired_docs = []
+        evidence = expired_docs_rule.evidence if isinstance(expired_docs_rule.evidence, dict) else {}
+        if isinstance(evidence, dict):
+            value = evidence.get("expired_documents", [])
+            if isinstance(value, list):
+                expired_docs = [str(item) for item in value]
+
+        for description in expired_docs:
+            doc_type = description.split(" (", 1)[0].strip().lower()
+            if not doc_type:
+                continue
+            if doc_type not in recommended_document_types:
+                recommended_document_types.append(doc_type)
+            rationale_by_document_type[doc_type] = (
+                "Existing uploaded document appears expired; upload a renewed valid version"
+            )
+
     recommended_next_actions = [
         "Request only high-impact missing documents first",
         "Re-run processing after document upload",
         "Review updated rule breakdown before final decision",
     ]
+
+    if expired_docs_rule:
+        recommended_next_actions.insert(
+            0,
+            "Request renewed unexpired identity/residency documents before decision",
+        )
 
     if risk_level == "high":
         recommended_next_actions.insert(0, "Prioritize this application for immediate reviewer follow-up")

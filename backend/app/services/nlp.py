@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from functools import lru_cache
 
 try:
@@ -30,6 +31,9 @@ class ExtractedEntities:
     language_indicators: list[str] = field(default_factory=list)
     residency_indicators: list[str] = field(default_factory=list)
     numeric_values: list[str] = field(default_factory=list)
+    # Dates that appear immediately after an expiry/validity label in the document.
+    # Only populated when a label like "Expiry date:", "Gyldig til:", "Valid until:" is present.
+    expiry_dates: list[str] = field(default_factory=list)
     raw_entity_count: int = 0
 
     def to_dict(self) -> dict[str, list[str] | int]:
@@ -43,6 +47,7 @@ class ExtractedEntities:
             "language_indicators": self.language_indicators,
             "residency_indicators": self.residency_indicators,
             "numeric_values": self.numeric_values,
+            "expiry_dates": self.expiry_dates,
             "raw_entity_count": self.raw_entity_count,
         }
 
@@ -113,6 +118,27 @@ _LANGUAGE_INDICATORS = [
     "samfunnskunnskap", "social studies", "civic integration",
     "norskkurs", "norwegian course", "language course",
     "kompetanse norge", "folkeuniversitetet",
+]
+
+# Expiry date context patterns.
+# These match a date that immediately follows a label indicating document expiry or
+# validity end date, in both English and Norwegian. Using contextual patterns (label +
+# date) avoids misidentifying birth dates or issue dates as expiry dates.
+_EXPIRY_CONTEXT_PATTERNS = [
+    # English: "expiry date", "date of expiry", "expires", "valid until/through/to"
+    r"(?:date\s+of\s+expir(?:y|ation)|expir(?:y|ation)\s+date|expir(?:es?|ed?)"
+    r"|valid\s+(?:until|through|to|till|thru)|validity\s+period\s+ends?)"
+    r"\s*[:\-]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4})",
+    r"(?:date\s+of\s+expir(?:y|ation)|expir(?:y|ation)\s+date|expir(?:es?|ed?)"
+    r"|valid\s+(?:until|through|to|till|thru)|validity\s+period\s+ends?)"
+    r"\s*[:\-]?\s*(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
+    # Norwegian: "gyldig til", "utløpsdato", "utløper", "gyldig frem til"
+    r"(?:gyldig\s+til|utløpsdato|utl(?:ø|o)psdato|utl(?:ø|o)per"
+    r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
+    r"\s*[:\-]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4})",
+    r"(?:gyldig\s+til|utløpsdato|utl(?:ø|o)psdato|utl(?:ø|o)per"
+    r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
+    r"\s*[:\-]?\s*(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
 ]
 
 # Residency / duration indicators
@@ -276,6 +302,12 @@ def extract_entities(text: str) -> ExtractedEntities:
     )
     entities.numeric_values = _dedupe(numeric_matches)
 
+    # Expiry dates — contextual patterns only (label + date)
+    for pattern in _EXPIRY_CONTEXT_PATTERNS:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        entities.expiry_dates.extend(matches)
+    entities.expiry_dates = _dedupe(entities.expiry_dates)
+
     # Total entity count
     entities.raw_entity_count = (
         len(entities.dates)
@@ -287,9 +319,37 @@ def extract_entities(text: str) -> ExtractedEntities:
         + len(entities.residency_indicators)
         + len(entities.addresses)
         + len(entities.numeric_values)
+        + len(entities.expiry_dates)
     )
 
     return entities
+
+
+def parse_date_flexible(date_str: str) -> date | None:
+    """Parse a date string in the common formats found on travel/identity documents.
+
+    Supports: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, YYYY.MM.DD, and
+    two-digit-year variants.  Returns ``None`` when the string cannot be parsed.
+    """
+    date_str = date_str.strip()
+    if not date_str:
+        return None
+    for fmt in (
+        "%d.%m.%Y",
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%Y-%m-%d",
+        "%Y.%m.%d",
+        "%Y/%m/%d",
+        "%d.%m.%y",
+        "%d/%m/%y",
+        "%d-%m-%y",
+    ):
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 def compute_document_nlp_score(entities: ExtractedEntities) -> float:
