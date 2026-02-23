@@ -1,6 +1,8 @@
 from collections.abc import Generator
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlmodel import Session, delete
 
@@ -12,8 +14,12 @@ from tests.utils.user import authentication_token_from_email
 from tests.utils.utils import get_superuser_token_headers
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def db() -> Generator[Session, None, None]:
+    # Ensure schema is up to date before any test touches the DB.
+    alembic_cfg = Config("alembic.ini")
+    command.upgrade(alembic_cfg, "head")
+
     with Session(engine) as session:
         init_db(session)
         yield session
@@ -25,7 +31,7 @@ def db() -> Generator[Session, None, None]:
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[TestClient, None, None]:
+def client(db: Session) -> Generator[TestClient, None, None]:
     with TestClient(app) as c:
         yield c
 

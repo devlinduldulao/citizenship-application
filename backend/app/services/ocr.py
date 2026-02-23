@@ -15,18 +15,48 @@ logger = logging.getLogger(__name__)
 
 
 def _configure_tesseract() -> None:
-    """Set pytesseract binary path from settings if configured."""
+    """Set pytesseract binary path from settings or auto-detect for the current platform."""
+    import sys
+
     try:
+        import pytesseract
         from app.core.config import settings
 
-        if settings.TESSERACT_CMD:
-            import pytesseract
-
+        # Use explicitly configured path only if it actually exists on the current OS.
+        if settings.TESSERACT_CMD and Path(settings.TESSERACT_CMD).is_file():
             pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
-            logger.info("Tesseract binary set to: %s", settings.TESSERACT_CMD)
+            logger.info("Tesseract binary configured from settings: %s", settings.TESSERACT_CMD)
+            return
+
+        # Auto-detect common installation locations per platform.
+        if sys.platform == "win32":
+            _candidates = [
+                r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+                str(Path.home() / "AppData" / "Local" / "Programs" / "Tesseract-OCR" / "tesseract.exe"),
+            ]
+        elif sys.platform == "darwin":
+            _candidates = [
+                "/opt/homebrew/bin/tesseract",  # Apple Silicon (M1/M2/M3)
+                "/usr/local/bin/tesseract",     # Intel Mac (Homebrew)
+            ]
+        else:
+            # Linux (Ubuntu, Debian, etc.)
+            _candidates = [
+                "/usr/bin/tesseract",
+                "/usr/local/bin/tesseract",
+            ]
+
+        for candidate in _candidates:
+            if Path(candidate).is_file():
+                pytesseract.pytesseract.tesseract_cmd = candidate
+                logger.info("Tesseract auto-detected at: %s", candidate)
+                return
+
+        # Fall back to pytesseract's default PATH lookup.
+        logger.debug("Tesseract not explicitly configured; relying on PATH lookup.")
     except Exception:
-        # Settings may not be available in test/import contexts — that's fine,
-        # pytesseract will fall back to PATH lookup.
+        # Settings or pytesseract may not be available in test/import contexts — that's fine.
         pass
 
 
