@@ -121,39 +121,61 @@ _LANGUAGE_INDICATORS = [
 ]
 
 # Expiry date context patterns.
-# These match a date that immediately follows a label indicating document expiry or
-# validity end date, in both English and Norwegian. Using contextual patterns (label +
-# date) avoids misidentifying birth dates or issue dates as expiry dates.
+# These match a date that appears near a label indicating document expiry or
+# validity end date, in English, Norwegian, and French. The gap between the label
+# and the date allows up to 60 characters of intervening text (billing labels,
+# newlines, field numbers) to handle real passport OCR output where the label and
+# its date value are often on separate lines or separated by bilingual text like
+# "Date of expiry / Date d'expiration\n04 JUL 2019".
+_EXPIRY_LABEL = (
+    r"(?:date\s+of\s+expir(?:y|ation)|date\s+d['\u2019]expiration"
+    r"|expir(?:y|ation)\s+date|expir(?:es?|ed?)"
+    r"|valid\s+(?:until|through|to|till|thru)|validity\s+period\s+ends?"
+    r"|gyldig\s+til|utl[oø]psdato|utl[oø]per"
+    r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
+)
+# Flexible gap: up to 60 chars of any content (newlines, bilingual text, field numbers).
+_GAP = r"[\s\S]{0,60}?"
+
 _EXPIRY_CONTEXT_PATTERNS = [
-    # English: "expiry date", "date of expiry", "expires", "valid until/through/to"
-    r"(?:date\s+of\s+expir(?:y|ation)|expir(?:y|ation)\s+date|expir(?:es?|ed?)"
-    r"|valid\s+(?:until|through|to|till|thru)|validity\s+period\s+ends?)"
-    r"\s*[:\-]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4})",
-    r"(?:date\s+of\s+expir(?:y|ation)|expir(?:y|ation)\s+date|expir(?:es?|ed?)"
-    r"|valid\s+(?:until|through|to|till|thru)|validity\s+period\s+ends?)"
-    r"\s*[:\-]?\s*(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
-    # Norwegian: "gyldig til", "utløpsdato", "utløper", "gyldig frem til"
-    r"(?:gyldig\s+til|utløpsdato|utl(?:ø|o)psdato|utl(?:ø|o)per"
-    r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
-    r"\s*[:\-]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4})",
-    r"(?:gyldig\s+til|utløpsdato|utl(?:ø|o)psdato|utl(?:ø|o)per"
-    r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
-    r"\s*[:\-]?\s*(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
-    # Textual month formats often found in IDs (e.g. "04 JUL 2019", "04 july 2019")
-    r"(?:date\s+of\s+expir(?:y|ation)|expir(?:y|ation)\s+date|expir(?:es?|ed?)"
-    r"|valid\s+(?:until|through|to|till|thru)|validity\s+period\s+ends?)"
-    r"\s*[:\-]?\s*(\d{1,2}(?:[./_\-]|\s)+[A-Za-zÆØÅæøå]{3,10}(?:\s*/\s*[A-Za-zÆØÅæøå]{3,10})?(?:[./_\-]|\s)+\d{2,4})",
-    r"(?:gyldig\s+til|utløpsdato|utl(?:ø|o)psdato|utl(?:ø|o)per"
-    r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
-    r"\s*[:\-]?\s*(\d{1,2}(?:[./_\-]|\s)+[A-Za-zÆØÅæøå]{3,10}(?:\s*/\s*[A-Za-zÆØÅæøå]{3,10})?(?:[./_\-]|\s)+\d{2,4})",
-    # Underscore-separated OCR strings (e.g. "2019_07_04")
-    r"(?:date\s+of\s+expir(?:y|ation)|expir(?:y|ation)\s+date|expir(?:es?|ed?)"
-    r"|valid\s+(?:until|through|to|till|thru)|validity\s+period\s+ends?)"
-    r"\s*[:\-]?\s*(\d{4}[._\-/]\d{1,2}[._\-/]\d{1,2})",
-    r"(?:gyldig\s+til|utløpsdato|utl(?:ø|o)psdato|utl(?:ø|o)per"
-    r"|gyldig\s+frem\s+til|sist\s+gyldig|gyldighet\s+til)"
-    r"\s*[:\-]?\s*(\d{4}[._\-/]\d{1,2}[._\-/]\d{1,2})",
+    # DD.MM.YYYY / DD/MM/YYYY / DD-MM-YYYY
+    _EXPIRY_LABEL + _GAP + r"(\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4})",
+    # YYYY-MM-DD / YYYY.MM.DD / YYYY/MM/DD
+    _EXPIRY_LABEL + _GAP + r"(\d{4}[./\-]\d{1,2}[./\-]\d{1,2})",
+    # Textual month: "04 JUL 2019", "04 JUL / JUIL 2019", "04 july 2019"
+    _EXPIRY_LABEL + _GAP + r"(\d{1,2}(?:[./_\-]|\s)+[A-Za-zÆØÅæøå]{3,10}"
+    r"(?:\s*/\s*[A-Za-zÆØÅæøå]{3,10})?(?:[./_\-]|\s)+\d{2,4})",
+    # Underscore OCR: "2019_07_04"
+    _EXPIRY_LABEL + _GAP + r"(\d{4}[._\-/]\d{1,2}[._\-/]\d{1,2})",
 ]
+
+# MRZ (Machine Readable Zone) expiry extraction.
+# ICAO 9303 passport MRZ line 2 has expiry date at character positions 21-26 (YYMMDD).
+# Format: <passport_number><check><nationality><DOB><check><sex><EXPIRY><check><...>
+_MRZ_TD3_LINE2 = re.compile(
+    r"[A-Z0-9<]{9}\d[A-Z<]{3}\d{6}\d[MF<X]\d{6}\d"
+)
+
+
+def _extract_mrz_expiry(text: str) -> list[str]:
+    """Extract expiry dates from ICAO TD3 MRZ lines (passports).
+
+    Returns dates as YYMMDD strings that can be parsed by parse_date_flexible.
+    """
+    results: list[str] = []
+    for line in text.splitlines():
+        clean = line.strip().replace(" ", "")
+        if len(clean) < 28:
+            continue
+        m = _MRZ_TD3_LINE2.search(clean)
+        if m:
+            matched = m.group(0)
+            # Expiry is at positions 21-27 of the match (after sex field at 20).
+            expiry_yymmdd = matched[21:27]
+            # Sanity check: must be 6 digits.
+            if expiry_yymmdd.isdigit():
+                results.append(expiry_yymmdd)
+    return results
 
 # Residency / duration indicators
 _RESIDENCY_INDICATORS = [
@@ -316,10 +338,12 @@ def extract_entities(text: str) -> ExtractedEntities:
     )
     entities.numeric_values = _dedupe(numeric_matches)
 
-    # Expiry dates — contextual patterns only (label + date)
+    # Expiry dates — contextual patterns (label + date) and MRZ extraction
     for pattern in _EXPIRY_CONTEXT_PATTERNS:
         matches = re.findall(pattern, text, re.IGNORECASE)
-        entities.expiry_dates.extend(matches)
+        entities.expiry_dates.extend(m.strip() for m in matches)
+    # MRZ-based expiry extraction (most reliable for passports)
+    entities.expiry_dates.extend(_extract_mrz_expiry(text))
     entities.expiry_dates = _dedupe(entities.expiry_dates)
 
     # Total entity count
