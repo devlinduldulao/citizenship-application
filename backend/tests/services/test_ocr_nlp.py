@@ -261,6 +261,49 @@ class TestExpiryDateExtraction:
         entities_with_expiry = extract_entities("Name: Ali Hassan\nExpiry date: 31.12.2030")
         assert entities_with_expiry.raw_entity_count > entities_no_expiry.raw_entity_count
 
+    def test_bilingual_label_newline_gap(self) -> None:
+        text = "Date of expiry / Date d\u2019expiration\n04 JUL 2029\n"
+        entities = extract_entities(text)
+        assert len(entities.expiry_dates) > 0
+
+    def test_bilingual_label_with_date_dexpiration(self) -> None:
+        entities = extract_entities("Date d'expiration\n15.08.2029")
+        assert len(entities.expiry_dates) > 0
+
+    def test_french_label_standalone(self) -> None:
+        entities = extract_entities("Date d'expiration: 04.07.2019")
+        assert "04.07.2019" in entities.expiry_dates
+
+    def test_norwegian_label_newline_gap(self) -> None:
+        entities = extract_entities("Utl\u00f8psdato\n04.07.2019")
+        assert "04.07.2019" in entities.expiry_dates
+
+    def test_mrz_expiry_extraction(self) -> None:
+        text = (
+            "P<NORHASSAN<<AHMED<<<<<<<<<<<<<<<<<<<<<<<<<<\n"
+            "NO1234567<0NOR9003155M2907047<<<<<<<<<<<<<<00\n"
+        )
+        entities = extract_entities(text)
+        assert "290704" in entities.expiry_dates
+
+    def test_mrz_only_passport_has_expiry(self) -> None:
+        text = (
+            "KINGDOM OF NORWAY\nPASSPORT\n"
+            "P<NORHASSAN<<AHMED<<<<<<<<<<<<<<<<<<<<<<<<<<\n"
+            "NO1234567<0NOR9003155M2907047<<<<<<<<<<<<<<00\n"
+        )
+        entities = extract_entities(text)
+        assert len(entities.expiry_dates) > 0
+
+    def test_both_label_and_mrz_expiry(self) -> None:
+        text = (
+            "Date of expiry: 04.07.2029\n"
+            "P<NORHASSAN<<AHMED<<<<<<<<<<<<<<<<<<<<<<<<<<\n"
+            "NO1234567<0NOR9003155M2907047<<<<<<<<<<<<<<00\n"
+        )
+        entities = extract_entities(text)
+        assert len(entities.expiry_dates) >= 1
+
 
 class TestParseDateFlexible:
     """Unit tests for the parse_date_flexible utility."""
