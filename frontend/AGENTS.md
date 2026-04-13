@@ -3,6 +3,13 @@
 > IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks in this project.
 > Always explore the project structure before writing code.
 
+## Agent Workflow
+
+1. Read this file before editing anything in `frontend/`
+2. Preserve the existing route and component structure instead of refactoring for style alone
+3. Prefer the smallest relevant Vitest run before package-wide checks
+4. Do not edit generated files manually: `src/client/`, `src/routeTree.gen.ts`, `src/components/ui/`
+
 ## Tech Stack
 
 | Category       | Technology                          | Version        |
@@ -77,7 +84,7 @@ frontend/
 │   │   └── reset-password.tsx         # Password reset
 │   ├── components/
 │   │   ├── ui/                        # shadcn/ui primitives (DO NOT EDIT MANUALLY)
-│   │   ├── Common/                    # Shared components (DataTable, Footer, Logo, etc.)
+│   │   ├── Common/                    # Shared components (Appearance, AuthLayout, DataTable, ErrorComponent, Footer, Logo, NotFound)
 │   │   ├── Admin/                     # Admin feature components (AddUser, EditUser, etc.)
 │   │   ├── Items/                     # Item feature components (AddItem, EditItem, etc.)
 │   │   ├── Pending/                   # Loading skeleton components
@@ -91,10 +98,10 @@ frontend/
 │   │   └── useMobile.ts              # Mobile breakpoint detection
 │   └── lib/
 │       └── utils.ts                   # cn() utility (clsx + tailwind-merge)
-├── tests/                             # Vitest unit tests
-│   └── ...                            # Test files (*.test.ts/tsx)
-└── public/
-    └── assets/                        # Static assets
+├── public/
+│   └── assets/                        # Static assets
+└── scripts/
+    └── check-api-client-usage.mjs    # Validates API client is used correctly
 ```
 
 ## Critical Conventions
@@ -130,6 +137,8 @@ function ApplicationsPage() {
   return <div>Applications content</div>
 }
 
+// Route files must export a named Route constant.
+// Some existing files also default-export the component; preserve that pattern when editing them.
 // Route files in src/routes/ auto-generate src/routeTree.gen.ts (DO NOT EDIT that file)
 // Auth guard is in _layout.tsx via beforeLoad + isLoggedIn() check
 ```
@@ -265,8 +274,8 @@ import useAuth from "@/hooks/useAuth"
 import { UsersService } from "@/client"
 import { cn } from "@/lib/utils"
 
-// Route files use default exports (TanStack Router convention)
-// All other files prefer named exports
+// Route files must export Route; component default exports are tolerated only where the file already uses them
+// Prefer named exports elsewhere
 ```
 
 ### Biome Configuration
@@ -279,6 +288,10 @@ Biome handles both linting and formatting:
 - Excludes: `dist/`, `node_modules/`, `routeTree.gen.ts`, `src/client/`, `src/components/ui/`
 
 ### Testing — Vitest Unit Tests
+
+Tests live in two locations:
+- **Co-located tests**: Place `.test.ts` files next to the source file (e.g., `src/hooks/useAuth.test.ts`, `src/utils.test.ts`, `src/lib/utils.test.ts`)
+- **Feature tests**: Place in `src/tests/` for integration/feature tests (e.g., `src/tests/applications.test.ts`)
 
 ```typescript
 // ✅ Correct — Vitest unit tests with Testing Library
@@ -334,3 +347,4 @@ bun run generate-client
 - Add/update tests for any code changes
 - Title format: `[component/feature] Description`
 - Never commit changes to auto-generated files (`routeTree.gen.ts`, `src/client/`)
+- If backend API shapes changed, run `bun run generate-client` and re-run `bun run check:api-client`

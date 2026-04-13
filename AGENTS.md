@@ -3,6 +3,22 @@
 > IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks in this project.
 > Always explore the project structure before writing code. Read the nearest AGENTS.md in the directory you're editing.
 
+## Agent Workflow
+
+1. **Read the nearest AGENTS.md** to the file you're editing before making changes
+2. **Explore the project structure** — don't assume file locations
+3. **Treat this root file as shared monorepo guidance** — use `backend/AGENTS.md` or `frontend/AGENTS.md` for package-level implementation details
+4. **Prefer narrow validation first** — run the smallest relevant test or lint command for touched files before widening to package-level checks
+5. **Run tests** after making changes: `uv run pytest` (backend) or `bun run test` (frontend)
+6. **Run linters** before committing: `uv run ruff check .` (backend) or `bun run lint` (frontend)
+7. **Do NOT edit auto-generated files**: `frontend/src/client/`, `frontend/src/routeTree.gen.ts`, `frontend/src/components/ui/`
+
+## Monorepo Routing
+
+- Use the root `package.json` for workspace-level frontend commands such as `bun run dev`, `bun run lint`, and `bun run test`
+- Run backend commands from `backend/` and frontend commands from `frontend/`
+- If a backend API contract changes, regenerate the frontend client with `cd frontend && bun run generate-client`
+
 ## Project Overview
 
 Full-stack monorepo automating Norway's citizenship application process. Combines document intake, OCR extraction, explainable rule-based eligibility scoring, caseworker decision support, and immutable audit trails. Targeted at UDI/Politi stakeholders.
@@ -21,7 +37,7 @@ Full-stack monorepo automating Norway's citizenship application process. Combine
 ├── frontend/            ← React SPA (Vite, TanStack Router, Tailwind CSS)
 │   ├── AGENTS.md        ← Frontend-specific agent instructions
 │   ├── src/             ← Source (routes, components, hooks, client)
-│   └── tests/           ← Vitest unit tests
+│   └── src/tests/       ← Feature-level Vitest tests (other tests are co-located)
 └── scripts/             ← Cross-project utility scripts
 ```
 
@@ -57,6 +73,7 @@ docker compose down                  # Stop everything
 ```bash
 cd backend
 uv sync                              # Install dependencies
+uv run pytest tests/path/to/test.py  # Preferred when a narrow backend test exists
 uv run fastapi dev app/main.py       # Dev server on :8000
 uv run pytest                        # Run tests
 uv run ruff check .                  # Lint
@@ -71,6 +88,7 @@ uv run alembic revision --autogenerate -m "description"  # Generate migration
 ```bash
 cd frontend
 bun install                          # Install dependencies
+bun run test src/path/to/file.test.ts # Preferred when a narrow frontend test exists
 bun run dev                          # Dev server on :5173
 bun run build                        # Production build
 bun run lint                         # Biome lint + format
@@ -106,6 +124,7 @@ bun run test                         # Run frontend tests
 - **API routes:** `app/api/routes/` — one file per resource (`applications.py`, `users.py`, `items.py`, `login.py`)
 - **Config:** `app/core/config.py` — Pydantic Settings reading from `../.env`
 - **Auth:** JWT tokens via `app/core/security.py`, dependency injection in `app/api/deps.py`
+- **Services:** `app/services/` — standalone modules for OCR (`ocr.py`), NLP extraction (`nlp.py`), and case explanation (`case_explainer.py`). These are NOT service classes — they are flat function-based modules
 - **Migrations:** Alembic in `app/alembic/versions/`
 
 Key domain models: `CitizenshipApplication`, `ApplicationDocument`, `EligibilityRuleResult`, `ApplicationAuditEvent`
@@ -118,7 +137,7 @@ Application statuses: `draft → documents_uploaded → queued → processing �
 - **API client:** Auto-generated from backend OpenAPI spec (`src/client/`)
 - **Components:** `src/components/` — shadcn/ui primitives in `ui/`, feature components in named folders
 - **State:** TanStack Query for server state, local React state for UI
-- **Theming:** `next-themes` provider with dark mode default
+- **Theming:** Custom `ThemeProvider` with dark mode default
 
 Route structure: `__root.tsx` → `_layout.tsx` → `{admin,applications,items,settings,index}.tsx` + auth routes (`login`, `signup`, `recover-password`, `reset-password`)
 
@@ -148,7 +167,7 @@ Route structure: `__root.tsx` → `_layout.tsx` → `{admin,applications,items,s
 ## Testing Instructions
 
 - **Backend:** `cd backend && uv run pytest` — all tests must pass before committing
-- **Frontend unit:** `cd frontend && bun run test` — Vitest unit tests
+- **Frontend unit:** `cd frontend && bun run test` — Vitest tests in `src/tests/` and co-located `*.test.ts(x)` files
 - Add or update tests for every code change, even if not explicitly asked
 
 ## Pre-commit & Quality Gates
@@ -202,5 +221,4 @@ All configuration is in the root `.env` file. Key variables:
 | Development     | `development.md`                                      |
 | Deployment      | `deployment.md`                                       |
 | Contributing    | `CONTRIBUTING.md`                                     |
-| Release Notes   | `release-notes.md`                                    |
 | Security        | `SECURITY.md`                                         |

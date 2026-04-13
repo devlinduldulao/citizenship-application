@@ -3,11 +3,18 @@
 > IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for any tasks in this project.
 > Always explore the project structure before writing code.
 
+## Agent Workflow
+
+1. Read this file before editing anything in `backend/`
+2. Keep changes inside the existing flat architecture unless the task explicitly requires structural change
+3. Prefer the smallest relevant pytest target before running the full backend suite
+4. Run `uv run ruff check .` and `uv run pytest` after changes; run `uv run mypy app/` when types or interfaces move
+
 ## Tech Stack
 
 | Category         | Technology                  | Version / Constraint      |
 | ---------------- | --------------------------- | ------------------------- |
-| Language         | Python                      | >=3.10, <4.0              |
+| Language         | Python                      | >=3.13, <4.0              |
 | Framework        | FastAPI                     | >=0.114.2, <1.0.0         |
 | ORM / Schemas    | SQLModel (wraps SQLAlchemy) | >=0.0.21, <1.0.0          |
 | Validation       | Pydantic                    | >2.0                      |
@@ -30,6 +37,7 @@
 uv sync                              # Install dependencies from pyproject.toml
 uv run fastapi dev app/main.py       # Dev server with hot reload on :8000
 uv run fastapi run app/main.py       # Production server
+uv run pytest tests/path/to/test.py  # Preferred when a narrow backend test exists
 uv run pytest                         # Run all tests
 uv run mypy app/                      # Type check (strict mode)
 uv run ruff check .                   # Lint
@@ -75,6 +83,10 @@ backend/
 │   ├── alembic/
 │   │   ├── env.py
 │   │   └── versions/                  # Migration scripts
+│   ├── services/
+│   │   ├── ocr.py                     # PyMuPDF + Tesseract OCR document extraction
+│   │   ├── nlp.py                     # spaCy + regex NLP extraction from OCR text
+│   │   └── case_explainer.py          # Eligibility scoring with rule explanations
 │   └── email-templates/               # Jinja2 email templates
 ├── data/
 │   └── uploads/                       # File upload storage (per-application UUID dirs)
@@ -88,6 +100,13 @@ backend/
 │   │   └── test_private.py
 │   ├── crud/
 │   │   └── test_user.py              # CRUD unit tests
+│   ├── services/
+│   │   ├── test_ocr_nlp.py           # OCR + NLP integration tests
+│   │   └── test_tesseract_ocr.py     # Tesseract OCR unit tests
+│   ├── unit/
+│   │   ├── test_application_logic.py # Application logic unit tests
+│   │   ├── test_models.py            # Model unit tests
+│   │   └── test_security.py          # Security unit tests
 │   ├── scripts/                       # Pre-start script tests
 │   └── utils/                         # Test helper utilities
 ├── scripts/
@@ -95,7 +114,8 @@ backend/
 │   ├── test.sh                        # Test runner script
 │   ├── tests-start.sh                 # Test startup script
 │   ├── lint.sh                        # Lint script
-│   └── format.sh                      # Format script
+│   ├── format.sh                      # Format script
+│   └── smoke_ocr_nlp.py              # Smoke test for OCR + NLP pipeline
 ```
 
 ## Critical Conventions
@@ -126,6 +146,23 @@ def create_user(*, session: Session, user_create: UserCreate) -> User:
 
 # ❌ Wrong — Do NOT create service classes or repository classes
 # ❌ Wrong — Do NOT use async sessions (this project uses sync SQLModel)
+```
+
+### Services Layer (Flat Functions, NOT Classes)
+
+The `app/services/` directory contains standalone function-based modules for document processing and eligibility scoring. These are NOT service classes — do NOT wrap them in classes or inject them via `Depends`.
+
+- `ocr.py` — Extracts text from PDF/image documents using PyMuPDF (for PDFs) and Tesseract OCR (for images)
+- `nlp.py` — Extracts structured data (names, dates, nationalities) from OCR text using spaCy (`nb_core_news_sm`) and regex patterns
+- `case_explainer.py` — Runs eligibility rules against extracted data to produce scored `EligibilityRuleResult` entries with human-readable rationale
+
+```python
+# ✅ Correct — Call service functions directly from route handlers
+from app.services.ocr import extract_text_from_document
+from app.services.nlp import extract_fields_from_text
+from app.services.case_explainer import evaluate_eligibility
+
+# ❌ Wrong — Do NOT create service classes or inject services via Depends
 ```
 
 ### SQLModel Pattern (NOT raw SQLAlchemy)
@@ -394,3 +431,4 @@ draft → documents_uploaded → queued → processing → review_ready → appr
 - Add/update tests for any code changes
 - Include Alembic migrations for any model changes
 - Title format: `[module/feature] Description`
+- If backend API contracts change, regenerate the frontend client from `frontend/` with `bun run generate-client`
